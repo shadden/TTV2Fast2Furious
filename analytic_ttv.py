@@ -372,6 +372,17 @@ def MultiplanetSystemBasisFunctionMatrices(Nplanets,Periods,T0s,Ntransits,**kwar
                 continue
     return BasisFunctionMatrices
 ###################################
+def SetupInteractionMatrixWithMaxPeriodRatio(Periods, MaxRatio):
+    Np=len(Periods)
+    entries = []
+    for P1 in Periods:
+        for P2 in Periods:
+            entries.append(np.max((P1/P2,P2/P1)) < MaxRatio)
+    entries=np.array(entries).reshape((Np,Np))
+    for i in range(Np):
+        entries[i,i]=False
+    return entries
+###################################
 def get_ttv_model_amplitudes(Pi,Pj,T0i,T0j,massi,massj,ei,ej,pmgi,pmgj):
     if Pi<Pj:
         Xi,Xj = PlanetPropertiestoLinearModelAmplitudes(T0i,Pi,massi,ei,pmgi,T0j,Pj,massj,ej,pmgj)
@@ -418,3 +429,113 @@ def MultiplanetSystemLinearModelAmplitudes(Nplanets,Periods,T0s,masses,eccs,pome
             else:
                 pass
     return Xs
+###################################
+ass PlanetTransitObservations(object):
+    def __init__(self,transit_numbers,times,uncertainties):
+        self.transit_numbers=transit_numbers
+        self.times=times
+        self.uncertainties = uncertainties
+    @classmethod
+    def from_times_only(cls,times,unc=0):
+        Ntr = len(times)
+        nums = np.arange(Ntr)
+        sigma = unc * np.ones(Ntr)
+        return cls(nums,times,sigma)
+    @property
+    def Ntransits(self):
+        return len(self.times)
+    
+    @property
+    def weighted_obs_vector(self):
+        return self.times / self.uncertainties
+    
+    def basis_function_matrix(self):
+        constant_basis = np.ones(self.Ntransits)
+        return np.vstack(( constant_basis , self.transit_numbers)).T
+    def linear_fit_design_matrix(self):
+        constant_basis = np.ones(self.Ntransits)
+        sigma = self.uncertainties
+        design_matrix = np.vstack(( constant_basis / sigma , self.transit_numbers / sigma )).T
+        return design_matrix
+    
+    def linear_best_fit(self):
+        sigma = self.uncertainties
+        y = self.weighted_obs_vector
+        A = self.linear_fit_design_matrix()
+        fitresults = np.linalg.lstsq(A,y)
+        return fitresults[0]
+    def linear_fit_residuals(self):
+        M = self.basis_function_matrix()
+        best = self.linear_best_fit()
+        return self.times - M.dot(best)
+
+    
+
+
+class TransitTimesLinearModels(object):
+
+    def __init__(self,observations_list):
+        self.observations=observations_list
+        initial_linear_fit_data = np.array([obs.linear_best_fit() for obs in self.observations ])
+        self.T0s = initial_linear_fit_data[:,0]
+        self.periods = initial_linear_fit_data[:,1]
+        self.basis_function_matrices = [obs.basis_function_matrix() for obs in self.observations ]
+        self._maximum_interaction_period_ratio = np.infty
+        
+    @classmethod
+    def from_multi_tranet(cls,multi_system,ttv_interface,short_cadence=True):
+        times_list = get_nominal_transit_times(multi_system,ttv_interface)
+        obs_list=[]
+        planets = multi_system.detected_planets
+        for i,pl in enumerate(planets):
+            times = times_list[i]
+            if short_cadence:
+                unc = pl.midtime_unc_2min
+            else:
+                unc = pl.midtime_unc_30min
+            obs_list.append( PlanetTransitObservations.from_times_only(times, unc) )
+        return cls(obs_list)    
+    @property
+    def maximum_interaction_period_ratio(self):
+        return self._maximum_interaction_period_ratio
+    @maximum_interaction_period_ratio.setter
+    def maximum_interaction_period_ratio(self,value):
+        self._maximum_interaction_period_ratio =  value
+        
+    @property
+    def N(self):
+        return len(self.observations)
+    @property
+    def weighted_obs_vectors(self):
+        return [obs.weighted_obs_vector for obs in self.observations]
+    @property
+    def design_matrices(self):
+        bfs = self.basis_function_matrices
+        uncs= [o.uncertainties for o in self.observations ]
+        return [np.transpose(bfs[i].T/uncs[i]) for i in range(self.N)]
+    
+    @property
+    def best_fits(self):
+        A = self.design_matrices
+        y = self.weighted_obs_vectors
+        return [np.linalg.lstsq(A[i],y[i])[0] for i in range(self.N)]
+        
+    def quicklook_plot(self,axis):
+        for obs in self.observations:
+            resid_MIN = 24*60*(obs.linear_fit_residuals())
+            unc_MIN = 24*60*obs.uncertainties
+            axis.errorbar(obs.times,resid_MIN,yerr=unc_MIN)
+        axis.set_xlabel("Time [d.]")
+        axis.set_ylabel("TTV [min.]")
+    
+    def generate_new_basis_function_matrices(self):
+        MaximumPeriodRatio = self.maximum_interaction_period_ratio
+        i_matrix=SetupInteractionMatrixWithMaxPeriodRatio(self.periods,MaximumPeriodRatio)
+        maxTransitNumbers = [np.max(o.transit_numbers)+1 for o in self.observations]
+        bf_matrices_full = MultiplanetSystemBasisFunctionMatrices(\
+                            self.N,self.periods,self.T0s,maxTransitNumbers,InteractionMatrix=i_matrix)
+        return [bf_matrices_full[i][(self.observations[i].transit_numbers)] for i in range(self.N)]
+    
+    def update_fits(self):
+        self.basis_function_matrices = self.generate_new_basis_function_matrices()
+        self.periods = [fit[1] for fit in self.best_fits]

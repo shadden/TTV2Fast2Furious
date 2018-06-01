@@ -228,40 +228,9 @@ def get_superperiod(P,P1):
     SuperP = (j/P1 - (j-1)/P)**(-1)
     return SuperP
 
-########################################
-def ttv_design_matrix_inner(P,P1,T0,T10,Ntrans,IncludeLinearBasis=True):
-    j = get_nearest_firstorder(P/P1)
-    superP = get_superperiod(P,P1)
-    superPhase = 2*np.pi * (j * (-T10/P1) - (j-1) * (-T0/P) )
-    Times = T0 + np.arange(Ntrans) * P
-
-    dt0 = dt0_InnerPlanet(P,P1,T0,T10,Ntrans)
-    superSin = np.sin(2*np.pi * Times / superP + superPhase)
-    superCos = np.cos(2*np.pi * Times / superP + superPhase)
-    
-    if IncludeLinearBasis:
-        design_matrix=np.vstack((np.ones(Ntrans),np.arange(Ntrans),dt0,superSin,superCos)).T
-    else:
-        design_matrix=np.vstack((dt0,superSin,superCos)).T
-
-    return design_matrix
-
-def ttv_design_matrix_outer(P,P1,T0,T10,Ntrans,IncludeLinearBasis=True):
-    j = get_nearest_firstorder(P/P1)
-    superP = get_superperiod(P,P1)
-    superPhase = 2*np.pi * (j * (-T10/P1) - (j-1) * (-T0/P) )
-    Times = T10 + np.arange(Ntrans) * P1
-
-    dt0 = dt0_OuterPlanet(P,P1,T0,T10,Ntrans)
-    superSin = np.sin(2*np.pi * Times / superP + superPhase)
-    superCos = np.cos(2*np.pi * Times / superP + superPhase)
-    
-    if IncludeLinearBasis:
-        design_matrix=np.vstack((np.ones(Ntrans),np.arange(Ntrans),dt0,superSin,superCos)).T
-    else:
-        design_matrix=np.vstack((dt0,superSin,superCos)).T
-    return design_matrix
-    
+###########################################################
+########## sympy for laplace coefficients #################
+##########################################################
 from sympy import hyper,hyperexpand,S,binomial,diff,Subs,N
 _j = S("j")
 _alpha = S("alpha")
@@ -273,13 +242,71 @@ def get_fCoeffs(j,alpha):
     fCoeffIn = N(Subs(fCoeffInExprn,[_j,_alpha],[j,alpha])) 
     fCoeffOut = N(Subs(fCoeffOutExprn,[_j,_alpha],[j-1,alpha])) 
     # Add indirect term
-    if j=2:
+    if j==2:
      # Evaluated exactly on resonance, indirect contribution to 
      # fCoeffOut is the same for inner and outer planet. It is 
      # different for different values of aIn/aOut but I'm ignoring
      # this for now.
         fCoeffOut = fCoeffOut - 2.0**(1./3.)
-    return fCoeffIn,fCoeffOut
+    return float(fCoeffIn),float(fCoeffOut)
+########################################
+def ttv_basis_function_matrix_inner(P,P1,T0,T10,Ntrans,IncludeLinearBasis=True):
+    j = get_nearest_firstorder(P/P1)
+    superP = get_superperiod(P,P1)
+    superPhase = 2*np.pi * (j * (-T10/P1) - (j-1) * (-T0/P) )
+    Times = T0 + np.arange(Ntrans) * P
+
+    # Normalize super-sin/cos so that basis fn amplitude is mu * (Zx/Zy)
+    #
+    j_2 = 1.0 / j / j
+    Delta = (j-1) * P1 / P / j - 1
+    Delta_2 = 1.0 / Delta / Delta
+    alpha = (P/P1)**(2./3.)
+    alpha_2 = 1.0 / alpha / alpha
+    fCoeffIn,fCoeffOut=get_fCoeffs(j,alpha)
+    denom = (fCoeffIn*fCoeffIn + fCoeffOut*fCoeffOut)**(0.5)
+    S =  1.5 * (1-j) * alpha_2 * j_2 * Delta_2 * denom * P / (np.pi)
+    C = -1.5 * (1-j) * alpha_2 * j_2 * Delta_2 * denom * P / (np.pi)
+
+    dt0 = dt0_InnerPlanet(P,P1,T0,T10,Ntrans)
+    superSin = S * np.sin(2*np.pi * Times / superP + superPhase)
+    superCos = C * np.cos(2*np.pi * Times / superP + superPhase)
+    
+    if IncludeLinearBasis:
+        basis_function_matrix=np.vstack((np.ones(Ntrans),np.arange(Ntrans),dt0,superSin,superCos)).T
+    else:
+        basis_function_matrix=np.vstack((dt0,superSin,superCos)).T
+
+    return basis_function_matrix
+
+def ttv_basis_function_matrix_outer(P,P1,T0,T10,Ntrans,IncludeLinearBasis=True):
+    j = get_nearest_firstorder(P/P1)
+    superP = get_superperiod(P,P1)
+    superPhase = 2*np.pi * (j * (-T10/P1) - (j-1) * (-T0/P) )
+    Times = T10 + np.arange(Ntrans) * P1
+
+    # Normalize super-sin/cos so that basis fn amplitude is mu * (Zx/Zy)
+    #
+    j_2 = 1.0 / j / j
+    Delta = (j-1) * P1 / P / j - 1
+    Delta_2 = 1.0 / Delta / Delta
+    alpha = (P/P1)**(2./3.)
+    alpha_2 = 1.0 / alpha / alpha
+    fCoeffIn,fCoeffOut=get_fCoeffs(j,alpha)
+    denom = (fCoeffIn*fCoeffIn + fCoeffOut*fCoeffOut)**(0.5)
+    S1 =  1.5 * (j) * j_2 * Delta_2 * denom  * P1 / (np.pi)
+    C1 = -1.5 * (j) * j_2 * Delta_2 * denom  * P1 / (np.pi)
+
+    dt0 = dt0_OuterPlanet(P,P1,T0,T10,Ntrans)
+    superSin = S1 * np.sin(2*np.pi * Times / superP + superPhase)
+    superCos = C1 * np.cos(2*np.pi * Times / superP + superPhase)
+    
+    if IncludeLinearBasis:
+        basis_function_matrix=np.vstack((np.ones(Ntrans),np.arange(Ntrans),dt0,superSin,superCos)).T
+    else:
+        basis_function_matrix=np.vstack((dt0,superSin,superCos)).T
+    return basis_function_matrix
+    
 ###################################
 def PlanetPropertiestoLinearModelAmplitudes(T0,P,mass,e,varpi,T10,P1,mass1,e1,varpi1):
     #assert(P<P1): print("Inner planet period is larger than outer planet's!")
@@ -302,23 +329,26 @@ def PlanetPropertiestoLinearModelAmplitudes(T0,P,mass,e,varpi,T10,P1,mass1,e1,va
     Zx /= denom
     Zy /= denom
 
-    S = mass1 * 1.5 * (1-j) * alpha_2 * j_2 * Delta_2 * denom * Zx * P / (np.pi)
-    C = -mass1 * 1.5 * (1-j) * alpha_2 * j_2 * Delta_2 * denom * Zy * P / (np.pi)
-    
-
-    S1 = mass * 1.5 * (j) * j_2 * Delta_2 * denom * Zx * P1 / (np.pi)
-    C1 = -mass * 1.5 * (j) * j_2 * Delta_2 * denom * Zy * P1 / (np.pi)
+    #S = mass1 * 1.5 * (1-j) * alpha_2 * j_2 * Delta_2 * denom * Zx * P / (np.pi)
+    #C = -mass1 * 1.5 * (1-j) * alpha_2 * j_2 * Delta_2 * denom * Zy * P / (np.pi)
+    #
+    #S1 = mass * 1.5 * (j) * j_2 * Delta_2 * denom * Zx * P1 / (np.pi)
+    #C1 = -mass * 1.5 * (j) * j_2 * Delta_2 * denom * Zy * P1 / (np.pi)
+    S = mass1 * Zx
+    C = mass1 * Zy
+    S1 = mass * Zx
+    C1 = mass * Zy
     return [T0,P,mass1,S,C],[T10,P1,mass,S1,C1]
 ###################################
-def get_ttv_design_matrix(Pi,Pj,T0i,T0j,Ntrans):
+def get_ttv_basis_function_matrix(Pi,Pj,T0i,T0j,Ntrans):
     if Pi < Pj:
-        return ttv_design_matrix_inner(Pi,Pj,T0i,T0j,Ntrans,IncludeLinearBasis=False)
+        return ttv_basis_function_matrix_inner(Pi,Pj,T0i,T0j,Ntrans,IncludeLinearBasis=False)
     else:
-        return ttv_design_matrix_outer(Pj,Pi,T0j,T0i,Ntrans,IncludeLinearBasis=False)
-def get_linear_basis_design_matrix(Ntransits):
+        return ttv_basis_function_matrix_outer(Pj,Pi,T0j,T0i,Ntrans,IncludeLinearBasis=False)
+def get_linear_basis_basis_function_matrix(Ntransits):
     return np.vstack((np.ones(Ntransits),np.arange(Ntransits))).T
 ###################################
-def MultiplanetSystemDesignMatrices(Nplanets,Periods,T0s,Ntransits,**kwargs):
+def MultiplanetSystemBasisFunctionMatrices(Nplanets,Periods,T0s,Ntransits,**kwargs):
     #assert(len(Periods)==Nplanets): "Improper period array size"
     #assert(len(T0s)==Nplanets): "Improper T0 array size"
     #assert(len(Ntransits)==Nplanets): "Improper Ntransits array size"
@@ -327,7 +357,7 @@ def MultiplanetSystemDesignMatrices(Nplanets,Periods,T0s,Ntransits,**kwargs):
         # No self-interactions!
         InteractionMatrix[i,i]=False
 
-    DesignMatrices=[get_linear_basis_design_matrix(Nt) for Nt in Ntransits]
+    BasisFunctionMatrices=[get_linear_basis_basis_function_matrix(Nt) for Nt in Ntransits]
     for i in range(Nplanets):
         Pi = Periods[i]
         T0i = T0s[i]
@@ -336,11 +366,11 @@ def MultiplanetSystemDesignMatrices(Nplanets,Periods,T0s,Ntransits,**kwargs):
             if InteractionMatrix[i,j]:
                 Pj = Periods[j]
                 T0j = T0s[j]
-                A = get_ttv_design_matrix(Pi,Pj,T0i,T0j,Ntransi)
-                DesignMatrices[i] = np.hstack((DesignMatrices[i],A))
+                A = get_ttv_basis_function_matrix(Pi,Pj,T0i,T0j,Ntransi)
+                BasisFunctionMatrices[i] = np.hstack((BasisFunctionMatrices[i],A))
             else:
                 continue
-    return DesignMatrices
+    return BasisFunctionMatrices
 ###################################
 def get_ttv_model_amplitudes(Pi,Pj,T0i,T0j,massi,massj,ei,ej,pmgi,pmgj):
     if Pi<Pj:

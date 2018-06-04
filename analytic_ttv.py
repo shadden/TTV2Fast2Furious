@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.special import gammainc,gammaincinv
 from scipy.special import ellipk,ellipkinc,ellipe,ellipeinc
 import scipy.integrate as integrate
 
@@ -430,17 +431,37 @@ def MultiplanetSystemLinearModelAmplitudes(Nplanets,Periods,T0s,masses,eccs,pome
                 pass
     return Xs
 ###################################
-ass PlanetTransitObservations(object):
+class PlanetTransitObservations(object):
     def __init__(self,transit_numbers,times,uncertainties):
-        self.transit_numbers=transit_numbers
-        self.times=times
-        self.uncertainties = uncertainties
+        self._transit_numbers=transit_numbers
+        self._times=times
+        self._uncertainties = uncertainties
+        self._Ntransits = len(times)
+        self._mask = np.ones(self._Ntransits,dtype=bool)
+
     @classmethod
     def from_times_only(cls,times,unc=0):
         Ntr = len(times)
         nums = np.arange(Ntr)
         sigma = unc * np.ones(Ntr)
         return cls(nums,times,sigma)
+
+    def function_mask(self,func):
+        self._mask = np.array(list(map(func,self._times)))
+
+    def unmask(self):
+        self._mask = np.ones(self._Ntransits,dtype=bool)
+
+    @property
+    def times(self):
+        return self._times[self._mask]    
+    @property
+    def transit_numbers(self):
+        return self._transit_numbers[self._mask]    
+    @property
+    def uncertainties(self):
+        return self._uncertainties[self._mask]    
+
     @property
     def Ntransits(self):
         return len(self.times)
@@ -482,19 +503,13 @@ class TransitTimesLinearModels(object):
         self.basis_function_matrices = [obs.basis_function_matrix() for obs in self.observations ]
         self._maximum_interaction_period_ratio = np.infty
         
-    @classmethod
-    def from_multi_tranet(cls,multi_system,ttv_interface,short_cadence=True):
-        times_list = get_nominal_transit_times(multi_system,ttv_interface)
-        obs_list=[]
-        planets = multi_system.detected_planets
-        for i,pl in enumerate(planets):
-            times = times_list[i]
-            if short_cadence:
-                unc = pl.midtime_unc_2min
-            else:
-                unc = pl.midtime_unc_30min
-            obs_list.append( PlanetTransitObservations.from_times_only(times, unc) )
-        return cls(obs_list)    
+    def reset(self):
+        initial_linear_fit_data = np.array([obs.linear_best_fit() for obs in self.observations ])
+        self.T0s = initial_linear_fit_data[:,0]
+        self.periods = initial_linear_fit_data[:,1]
+        self.basis_function_matrices = [obs.basis_function_matrix() for obs in self.observations ]
+        self._maximum_interaction_period_ratio = np.infty
+
     @property
     def maximum_interaction_period_ratio(self):
         return self._maximum_interaction_period_ratio
@@ -513,6 +528,10 @@ class TransitTimesLinearModels(object):
         bfs = self.basis_function_matrices
         uncs= [o.uncertainties for o in self.observations ]
         return [np.transpose(bfs[i].T/uncs[i]) for i in range(self.N)]
+    @property
+    def covariance_matrices(self):
+        A = self.design_matrices
+        return [ np.linalg.inv( A[i].T.dot(A[i]) ) for i in range(self.N)]
     
     @property
     def best_fits(self):
@@ -539,3 +558,23 @@ class TransitTimesLinearModels(object):
     def update_fits(self):
         self.basis_function_matrices = self.generate_new_basis_function_matrices()
         self.periods = [fit[1] for fit in self.best_fits]
+    
+    def compute_ttv_significance(self):
+        Sigma = self.covariance_matrices
+        mu = self.best_fits
+        significance_in_sigmas=[]
+        for i in range(self.N):
+            if len(mu[i] >2):
+                muTTV = mu[i][2:]
+                SigmaTTVinv= np.linalg.inv(Sigma[i][2:,2:])
+                chisquared = muTTV.dot(SigmaTTVinv.dot(muTTV))
+                dof = len(muTTV)
+                sigma=chiSquared_to_sigmas(chisquared,dof)
+                significance_in_sigmas.append(sigma)
+            else:
+                significance_in_sigmas.append(0)
+        return significance_in_sigmas
+
+def chiSquared_to_sigmas(chi2,dof):
+    p = gammainc(0.5 * dof, 0.5 * chi2)
+    return np.sqrt( 2 * gammaincinv( 0.5 , p ) )

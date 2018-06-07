@@ -502,6 +502,8 @@ class TransitTimesLinearModels(object):
         self.periods = initial_linear_fit_data[:,1]
         self.basis_function_matrices = [obs.basis_function_matrix() for obs in self.observations ]
         self._maximum_interaction_period_ratio = np.infty
+        self._interaction_matrix = SetupInteractionMatrixWithMaxPeriodRatio(self.periods,self.maximum_interaction_period_ratio)
+
         
     def reset(self):
         initial_linear_fit_data = np.array([obs.linear_best_fit() for obs in self.observations ])
@@ -509,14 +511,25 @@ class TransitTimesLinearModels(object):
         self.periods = initial_linear_fit_data[:,1]
         self.basis_function_matrices = [obs.basis_function_matrix() for obs in self.observations ]
         self._maximum_interaction_period_ratio = np.infty
+        self._interaction_matrix = SetupInteractionMatrixWithMaxPeriodRatio(self.periods,self.maximum_interaction_period_ratio)
+
+
+    @property 
+    def interaction_matrix(self):
+        return self._interaction_matrix
+    @interaction_matrix.setter
+    def interaction_matrix(self,value):
+        self._interaction_matrix = value
 
     @property
     def maximum_interaction_period_ratio(self):
         return self._maximum_interaction_period_ratio
+
     @maximum_interaction_period_ratio.setter
     def maximum_interaction_period_ratio(self,value):
-        self._maximum_interaction_period_ratio =  value
-        
+       self.interaction_matrix = SetupInteractionMatrixWithMaxPeriodRatio(self.periods,value)
+       self._maximum_interaction_period_ratio =  value
+    
     @property
     def N(self):
         return len(self.observations)
@@ -548,13 +561,12 @@ class TransitTimesLinearModels(object):
         axis.set_ylabel("TTV [min.]")
     
     def generate_new_basis_function_matrices(self):
-        MaximumPeriodRatio = self.maximum_interaction_period_ratio
-        i_matrix=SetupInteractionMatrixWithMaxPeriodRatio(self.periods,MaximumPeriodRatio)
+        i_matrix=self.interaction_matrix
         maxTransitNumbers = [np.max(o.transit_numbers)+1 for o in self.observations]
         bf_matrices_full = MultiplanetSystemBasisFunctionMatrices(\
                             self.N,self.periods,self.T0s,maxTransitNumbers,InteractionMatrix=i_matrix)
         return [bf_matrices_full[i][(self.observations[i].transit_numbers)] for i in range(self.N)]
-    
+
     def update_fits(self):
         self.basis_function_matrices = self.generate_new_basis_function_matrices()
         self.periods = [fit[1] for fit in self.best_fits]
@@ -574,6 +586,22 @@ class TransitTimesLinearModels(object):
             else:
                 significance_in_sigmas.append(0)
         return significance_in_sigmas
+
+def interactionIndicies(LMsystem,i,j):
+    i_matrix = LMsystem.interaction_matrix
+    if  i_matrix[i,j]:
+        k0 = 2 + 3 * np.sum( i_matrix[i,:j])
+        i_indices = k0 + np.arange(3,dtype=int)
+    else:
+        i_indices = []
+
+    if i_matrix[j,i]:
+        l0 = 2 + 3 * np.sum( i_matrix[j,:i])
+        j_indices = l0 + np.arange(3,dtype=int)
+    else:
+        j_indices = []
+    
+    return i_indices, j_indices
 
 def chiSquared_to_sigmas(chi2,dof):
     p = gammainc(0.5 * dof, 0.5 * chi2)

@@ -606,3 +606,4 @@ def interactionIndicies(LMsystem,i,j):
 def chiSquared_to_sigmas(chi2,dof):
     p = gammainc(0.5 * dof, 0.5 * chi2)
     return np.sqrt( 2 * gammaincinv( 0.5 , p ) )
+#############################################

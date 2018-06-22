@@ -237,8 +237,11 @@ _j = S("j")
 _alpha = S("alpha")
 _laplaceB= 2 * (-1)**_j *_alpha**_j * binomial(-1/S(2),_j)*hyper([1/S(2),_j+1/S(2)],[1+_j],_alpha*_alpha)
 _aDlaplaceB = _alpha * diff(_laplaceB,_alpha)
+_a2D2laplaceB = _alpha * _alpha * diff(_laplaceB,_alpha,_alpha)
 fCoeffInExprn = -_j * _laplaceB - (1/S(2)) * _aDlaplaceB
 fCoeffOutExprn = (_j + 1/S(2)) * _laplaceB + (1/S(2)) * _aDlaplaceB
+f49Coeff = -1 * (2 * _j * ( 1 + 2 *_j) * _laplaceB + (2 + 4 * _j) * _aDlaplaceB +  _a2D2laplaceB) / 4
+
 def get_fCoeffs(j,alpha):
     fCoeffIn = N(Subs(fCoeffInExprn,[_j,_alpha],[j,alpha])) 
     fCoeffOut = N(Subs(fCoeffOutExprn,[_j,_alpha],[j-1,alpha])) 
@@ -251,6 +254,59 @@ def get_fCoeffs(j,alpha):
         fCoeffOut = fCoeffOut - 2.0**(1./3.)
     return float(fCoeffIn),float(fCoeffOut)
 ########################################
+########### 2nd order res ##############
+########################################
+def get_gamma(k,alpha):
+    f49 =  N(Subs(f49Coeff, [_j,_alpha] , [k-1,alpha]))
+    j = int(np.ceil(k/2))
+    f27,f31 = get_fCoeffs(j,alpha)
+    # Eq. 58, Hadden & Lithwick '16
+    gamma = f49 * (f27*f27 + f31*f31) / f27 / f31 / 2
+    return gamma
+def get_nearest_secondorder(Pin_by_Pout):
+    return int(np.round(2 / (1 - Pin_by_Pout))) 
+def get_second_order_superperiod(Pin,Pout):
+    k = get_nearest_secondorder(Pin/Pout) 
+    nIn = 2*np.pi / Pin
+    nOut= 2*np.pi / Pout
+    nRes = k*nOut - (k-2)*nIn
+    return 2*np.pi / nRes
+def dt2_InnerPlanet(P,P1,T0,T10,Ntrans):
+    k=get_nearest_secondorder(P/P1)
+    superP = get_second_order_superperiod(P,P1)
+    superPhase = 2*np.pi * (k * (-T10/P1) - (k-2) * (-T0/P) )
+    Times = T0 + np.arange(Ntrans) * P
+
+    alpha = (P/P1)**(2./3.)
+    alpha_2 = 1.0 / alpha / alpha
+    gamma = get_gamma(k,alpha)
+    n_K_2minusK = (1 / P1) / (k /P1 + (2-k) / P )
+
+    # Eq. 60 of HL16
+    S =  1.5 * (2-k) * alpha_2 * n_K_2minusK**2 * gamma * P / (np.pi)
+    C = -1.5 * (2-k) * alpha_2 * n_K_2minusK**2 * gamma * P / (np.pi)
+    superSin = S * np.sin(2*np.pi * Times / superP + superPhase)
+    superCos = C * np.cos(2*np.pi * Times / superP + superPhase)
+    basis_function_matrix=np.vstack((superSin,superCos)).T
+    return basis_function_matrix
+
+def dt2_OuterPlanet(P,P1,T0,T10,Ntrans):
+    k=get_nearest_secondorder(P/P1)
+    superP = get_second_order_superperiod(P,P1)
+    superPhase = 2*np.pi * (k * (-T10/P1) - (k-2) * (-T0/P) )
+    Times = T10 + np.arange(Ntrans) * P1
+    alpha = (P/P1)**(2./3.)
+    gamma = get_gamma(k,alpha)
+    n_K_2minusK = (1 / P1) / (k /P1 + (2-k) / P )
+    # Eq. 60 of HL16
+    S =  1.5 * (k) * n_K_2minusK**2 * gamma * P1 / (np.pi)
+    C = -1.5 * (k) * n_K_2minusK**2 * gamma * P1 / (np.pi)
+    superSin = S * np.sin(2*np.pi * Times / superP + superPhase)
+    superCos = C * np.cos(2*np.pi * Times / superP + superPhase)
+    basis_function_matrix=np.vstack((superSin,superCos)).T
+    return basis_function_matrix
+########################################
+
 def ttv_basis_function_matrix_inner(P,P1,T0,T10,Ntrans,IncludeLinearBasis=True):
     j = get_nearest_firstorder(P/P1)
     superP = get_superperiod(P,P1)

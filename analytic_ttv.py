@@ -539,7 +539,7 @@ class PlanetTransitObservations(object):
         sigma = self.uncertainties
         y = self.weighted_obs_vector
         A = self.linear_fit_design_matrix()
-        fitresults = np.linalg.lstsq(A,y)
+        fitresults = np.linalg.lstsq(A,y,rcond=None)
         return fitresults[0]
     def linear_fit_residuals(self):
         M = self.basis_function_matrix()
@@ -606,8 +606,26 @@ class TransitTimesLinearModels(object):
     def best_fits(self):
         A = self.design_matrices
         y = self.weighted_obs_vectors
-        return [np.linalg.lstsq(A[i],y[i])[0] for i in range(self.N)]
+        return [np.linalg.lstsq(A[i],y[i],rcond=None)[0] for i in range(self.N)]
+
+    def chi_squareds(self,per_dof=False):
+        dms = self.design_matrices
+        obs_weighted = self.weighted_obs_vectors
+        bests = self.best_fits
+        normalized_resids = [obs_weighted[i] - dms[i].dot(bests[i]) for i in range(self.N)]
+        if per_dof:
+            return [nr.dot(nr) / len(nr) for nr in normalized_resids]  
+        else:
+            return [nr.dot(nr) for nr in normalized_resids]  
+    def Delta_BICs(self):
+        chi_squareds = self.chi_squareds()
+        bfm_shapes = [bfm.shape for bfm in self.basis_function_matrices] 
+        penalty_terms = [ x[1] * np.log( x[0] ) for x in bfm_shapes ]
+        BICs = np.array(chi_squareds) + np.array(penalty_terms)
         
+        line_fit_resids = [ obs.linear_fit_residuals() / obs.uncertainties for obs in self.observations ]
+        line_fit_BICs = np.array( [lfr.dot(lfr) + 2 * np.log(len(lfr)) for lfr in line_fit_resids] )
+        return line_fit_BICs - BICs
     def quicklook_plot(self,axis):
         for obs in self.observations:
             resid_MIN = 24*60*(obs.linear_fit_residuals())
@@ -626,7 +644,28 @@ class TransitTimesLinearModels(object):
     def update_fits(self):
         self.basis_function_matrices = self.generate_new_basis_function_matrices()
         self.periods = [fit[1] for fit in self.best_fits]
-    
+
+    def update_with_second_order_resonance(self,i1,i2):
+        self.basis_function_matrices = self.generate_new_basis_function_matrices()
+        pIn = self.periods[i1]
+        pOut = self.periods[i2]
+        tIn = self.T0s[i1]
+        tOut = self.T0s[i2]
+
+        obsIn = self.observations[i1]
+        obsOut = self.observations[i2]
+        NtrIn = obsIn.transit_numbers[-1] + 1
+        NtrOut = obsOut.transit_numbers[-1] + 1
+
+        t2in = dt2_InnerPlanet(pIn,pOut,tIn,tOut,NtrIn)
+        t2out = dt2_OuterPlanet(pIn,pOut,tIn,tOut,NtrOut)
+        t2in = t2in[obsIn.transit_numbers]
+        t2out = t2out[obsOut.transit_numbers]
+        self.basis_function_matrices[i1]=np.hstack((lmsystem.basis_function_matrices[i1],t2in))
+        self.basis_function_matrices[i2]=np.hstack((lmsystem.basis_function_matrices[i2],t2out))
+
+        self.periods = [fit[1] for fit in self.best_fits]
+
     def compute_ttv_significance(self):
         Sigma = self.covariance_matrices
         mu = self.best_fits

@@ -518,6 +518,10 @@ class PlanetTransitObservations(object):
     def uncertainties(self):
         return self._uncertainties[self._mask]    
 
+    @uncertainties.setter
+    def uncertainties(self,value):
+        self._uncertainties[self._mask] = value   
+
     @property
     def Ntransits(self):
         return len(self.times)
@@ -639,7 +643,7 @@ class TransitTimesLinearModels(object):
         maxTransitNumbers = [np.max(o.transit_numbers)+1 for o in self.observations]
         bf_matrices_full = MultiplanetSystemBasisFunctionMatrices(\
                             self.N,self.periods,self.T0s,maxTransitNumbers,InteractionMatrix=i_matrix)
-        return [bf_matrices_full[i][(self.observations[i].transit_numbers)] for i in range(self.N)]
+        return [bf_matrices_full[i][(self.observations[i].transit_numbers)].astype(float) for i in range(self.N)]
 
     def update_fits(self):
         self.basis_function_matrices = self.generate_new_basis_function_matrices()
@@ -661,8 +665,8 @@ class TransitTimesLinearModels(object):
         t2out = dt2_OuterPlanet(pIn,pOut,tIn,tOut,NtrOut)
         t2in = t2in[obsIn.transit_numbers]
         t2out = t2out[obsOut.transit_numbers]
-        self.basis_function_matrices[i1]=np.hstack((lmsystem.basis_function_matrices[i1],t2in))
-        self.basis_function_matrices[i2]=np.hstack((lmsystem.basis_function_matrices[i2],t2out))
+        self.basis_function_matrices[i1]=np.hstack((self.basis_function_matrices[i1],t2in)).astype(float)
+        self.basis_function_matrices[i2]=np.hstack((self.basis_function_matrices[i2],t2out)).astype(float)
 
         self.periods = [fit[1] for fit in self.best_fits]
 

@@ -1,3 +1,4 @@
+import warnings
 import numpy as np
 from scipy.special import gammainc,gammaincinv
 from scipy.special import ellipk,ellipkinc,ellipe,ellipeinc
@@ -309,6 +310,7 @@ def dt2_OuterPlanet(P,P1,T0,T10,Ntrans):
 
 def ttv_basis_function_matrix_inner(P,P1,T0,T10,Ntrans,IncludeLinearBasis=True):
     j = get_nearest_firstorder(P/P1)
+    assert j > 0 , "Bad period ratio!!! P,P1 = %.3f \t %.3f"%(P,P1)
     superP = get_superperiod(P,P1)
     superPhase = 2*np.pi * (j * (-T10/P1) - (j-1) * (-T0/P) )
     Times = T0 + np.arange(Ntrans) * P
@@ -338,6 +340,7 @@ def ttv_basis_function_matrix_inner(P,P1,T0,T10,Ntrans,IncludeLinearBasis=True):
 
 def ttv_basis_function_matrix_outer(P,P1,T0,T10,Ntrans,IncludeLinearBasis=True):
     j = get_nearest_firstorder(P/P1)
+    assert j > 0 , "Bad period ratio!!! P,P1 = %.3f \t %.3f"%(P,P1)
     superP = get_superperiod(P,P1)
     superPhase = 2*np.pi * (j * (-T10/P1) - (j-1) * (-T0/P) )
     Times = T10 + np.arange(Ntrans) * P1
@@ -543,7 +546,7 @@ class PlanetTransitObservations(object):
         sigma = self.uncertainties
         y = self.weighted_obs_vector
         A = self.linear_fit_design_matrix()
-        fitresults = np.linalg.lstsq(A,y,rcond=None)
+        fitresults = np.linalg.lstsq(A,y)
         return fitresults[0]
     def linear_fit_residuals(self):
         M = self.basis_function_matrix()
@@ -610,7 +613,7 @@ class TransitTimesLinearModels(object):
     def best_fits(self):
         A = self.design_matrices
         y = self.weighted_obs_vectors
-        return [np.linalg.lstsq(A[i],y[i],rcond=None)[0] for i in range(self.N)]
+        return [np.linalg.lstsq(A[i],y[i])[0] for i in range(self.N)]
 
     def chi_squareds(self,per_dof=False):
         dms = self.design_matrices
@@ -646,6 +649,13 @@ class TransitTimesLinearModels(object):
         return [bf_matrices_full[i][(self.observations[i].transit_numbers)].astype(float) for i in range(self.N)]
 
     def update_fits(self):
+        neg_periods_Q = np.any(np.array(self.periods)<0)
+        if neg_periods_Q:
+            warnings.warn("Negative period(s) found, resetting periods to linear best fit values!",RuntimeWarning)
+            old_max_int_per = self.maximum_interaction_period_ratio
+            self.reset()
+            self.maximum_interaction_period_ratio = old_max_int_per
+        
         self.basis_function_matrices = self.generate_new_basis_function_matrices()
         self.periods = [fit[1] for fit in self.best_fits]
 

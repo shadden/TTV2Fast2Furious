@@ -7,7 +7,8 @@ from ttv_basis_functions import get_nearest_firstorder,get_superperiod,dt0_Inner
 from ttv_basis_functions import get_nearest_secondorder,dt2_InnerPlanet,dt2_OuterPlanet
 
 def ttv_basis_function_matrix_inner(P,P1,T0,T10,Ntrans,IncludeLinearBasis=True):
-    """Compute the transit time basis function matrix, 'M', for a planet subject to an external perturber.
+    """
+    Compute the transit time basis function matrix, 'M', for a planet subject to an external perturber.
 
     Args:
         P (real): Inner planet period.
@@ -51,7 +52,8 @@ def ttv_basis_function_matrix_inner(P,P1,T0,T10,Ntrans,IncludeLinearBasis=True):
     return basis_function_matrix
 
 def ttv_basis_function_matrix_outer(P,P1,T0,T10,Ntrans,IncludeLinearBasis=True):
-    """Compute the transit time basis function matrix, 'M', for a planet subject to an interior perturber.
+    """
+    Compute the transit time basis function matrix, 'M', for a planet subject to an interior perturber.
 
     Args:
         P (real): Inner planet period.
@@ -95,7 +97,8 @@ def ttv_basis_function_matrix_outer(P,P1,T0,T10,Ntrans,IncludeLinearBasis=True):
     
 ###################################
 def PlanetPropertiestoLinearModelAmplitudes(T0,P,mass,e,varpi,T10,P1,mass1,e1,varpi1):
-    """Compute the transit time basis function amplitudes for a pair of planets.
+    """
+    Compute the transit time basis function amplitudes for a pair of planets.
 
     Args:
        T0 (real): Outer planet initial time of transit
@@ -142,6 +145,18 @@ def PlanetPropertiestoLinearModelAmplitudes(T0,P,mass,e,varpi,T10,P1,mass1,e1,va
     return np.array([T0,P,mass1,S,C]),np.array([T10,P1,mass,S1,C1])
 ###################################
 def get_ttv_basis_function_matrix(Pi,Pj,T0i,T0j,Ntrans):
+    """
+    Compute basis function matrix for planet `i`'s TTV due to planet `j`. 
+    
+    Arguments
+    --------
+    Pi: real
+        TTV planet's period
+    Pj: real
+        Perturbing planet's period
+    T0i: real
+        TTV planet's intial time of transit
+    """
     if Pi < Pj:
         return ttv_basis_function_matrix_inner(Pi,Pj,T0i,T0j,Ntrans,IncludeLinearBasis=False)
     else:
@@ -500,6 +515,24 @@ def interactionIndicies(LMsystem,i,j):
     return i_indices, j_indices
 
 def chiSquared_to_sigmas(chi2,dof):
+    """
+    Convert a chi-squared value to a confidence level, in terms of 'sigmas'
+
+    Arguments
+    ---------
+    
+    chi2: float
+        Chi-squared value
+
+    dof: int
+        Number of degrees of freedom
+
+    Returns
+    -------
+    
+    float:
+        The 'sigma's with the same confidence level for a 1D Gaussian
+    """
     p = gammainc(0.5 * dof, 0.5 * chi2)
     return np.sqrt( 2 * gammaincinv( 0.5 , p ) )
 #############################################

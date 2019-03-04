@@ -153,6 +153,32 @@ def get_linear_basis_basis_function_matrix(Ntransits):
     return np.vstack((np.ones(Ntransits),np.arange(Ntransits))).T
 ###################################
 def MultiplanetSystemBasisFunctionMatrices(Nplanets,Periods,T0s,Ntransits,**kwargs):
+    """
+    Compute basis function matrices for the transit times of an `Nplanet` system.
+
+    Parameters
+    ----------
+    Nplanets : int
+        The number of transting planets to model.
+    Periods  : ndarray
+        Array listing planets' orbital periods.
+    T0s      : ndarray
+        Array listing the times of planets' first transits
+    Ntransits: ndarray
+        Array listing the number of transits to compute for each planet.
+
+    Keyword Arguments
+    -----------------
+    ``InteractionMatrix``
+        Specify the interactions between planets as a matrix. 
+        By default, all planets are assumed to interact with one
+        antoher.
+
+    Returns
+    -------
+    list
+        List of ndarrays with columns containing TTV basis functions of each planet.
+    """
     InteractionMatrix=kwargs.get("InteractionMatrix",np.ones((Nplanets,Nplanets),dtype=bool))
     for i in range(Nplanets):
         # No self-interactions!

@@ -50,5 +50,5 @@ setup(name='ttv2fast2furious',
     packages=['ttv2fast2furious'],
     #install_requires=['mpmath>=1.0.0', 'numpy', 'scipy>=1.0.1'],
     #tests_require=['mpmath>=1.0.0', 'sympy>=1.1.1', 'rebound>=3.5.11', 'numpy', 'scipy>=1.0.1'],
-    test_suite="ttv2fast2furious.test"
+    #test_suite="ttv2fast2furious.test",
     zip_safe=False)

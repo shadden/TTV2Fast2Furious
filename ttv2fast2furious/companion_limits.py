@@ -4,8 +4,9 @@ from scipy.special import erf
 from scipy.optimize import minimize,LinearConstraint
 from scipy.integrate import trapz
 from .ttv_basis_functions import dt0_InnerPlanet,dt0_OuterPlanet
+from . import PlanetTransitObservations
 
-def PerturberPeriodPhaseToBestSigmaChiSquared(Ppert,phi,TransitData, PlanetData = None,full_output=False):
+def PerturberPeriodPhaseToBestSigmaChiSquared(Ppert,phi,TransitObesrvations, PlanetData = None,full_output=False):
     """
     Convert a hypothetical perturber period and phase to a mean and std. deviation
     of a gaussian distribution describing the perturber mass conditional posterior.
@@ -16,9 +17,8 @@ def PerturberPeriodPhaseToBestSigmaChiSquared(Ppert,phi,TransitData, PlanetData 
         Period of the pertuber
     phi : real
         Orbital phase of perturber
-    TransitData : list (optional)
-        Transit observation data given as a list of three arrays:
-            TransitData = [Numbers, Times, Uncertainties]
+    TransitData : `PlanetTransitObservations' object
+        Observation data on transiting planet
         Default value is set to $\pi$-Mensae c's data.
     PlanetData : list of reals (optional)
         List containing transiting planet's T0 and Period.
@@ -35,7 +35,10 @@ def PerturberPeriodPhaseToBestSigmaChiSquared(Ppert,phi,TransitData, PlanetData 
         the timing residuals.
     """
 
-    transit_num,transit_time,transit_unc = TransitData
+    transit_num = TransitObservations.transit_numbers
+    transit_time = TransitObservations.times
+    transit_unc = TransitObservations.uncertainties
+
     assert np.alltrue(transit_num>=0)
 
     yvec = transit_time / transit_unc
@@ -45,8 +48,7 @@ def PerturberPeriodPhaseToBestSigmaChiSquared(Ppert,phi,TransitData, PlanetData 
 
     if PlanetData is None:
         Ndata = len(transit_num)
-        A = np.vstack([np.ones(Ndata)/transit_unc, transit_num/transit_unc]).T
-        T0,P = np.linalg.lstsq(A , yvec,rcond=-1)[0]
+        T0,P = TransitObservations.linear_best_fit()
     else:
         T0,P = PlanetData
 
@@ -111,9 +113,8 @@ def UnseenPerturberMassUpperLimit(Ppert,confidence_levels,TransitData ,Nphi = 50
     confidence_levels : array-like
         The confidence level(s) for which to return mass upper limits.
 
-    TransitData : list of array-like
-        List containing transit observation data in the form:
-            TransitData = [transit numbers, transit times, transit time uncertainties]
+    TransitData : `PlanetTransitObservations' object
+        Observation data on transiting planet
 
     Nphi : int (optional)
         Number of perturber phase points used to compute integrals for marginalizing over phase.
@@ -135,7 +136,7 @@ def UnseenPerturberMassUpperLimit(Ppert,confidence_levels,TransitData ,Nphi = 50
     """
 
     phases = np.linspace(-np.pi,np.pi,Nphi)
-    mbest,sigma,chisq = np.array([PerturberPeriodPhaseToBestSigmaChiSquared(Ppert,phase,TransitData=TransitData,PlanetData=PlanetData) for phase in phases]).T
+    mbest,sigma,chisq = np.array([PerturberPeriodPhaseToBestSigmaChiSquared(Ppert,phase,TransitObesrvations,PlanetData=PlanetData) for phase in phases]).T
     dchisq = chisq - np.mean(chisq)
     q_of_mup = lambda mup: trapz( q_integrand(mup,mbest,sigma) * np.exp(-0.5 * dchisq),phases) / trapz(np.exp(-0.5 * dchisq),phases)
 

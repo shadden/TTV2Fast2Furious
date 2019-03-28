@@ -410,7 +410,7 @@ class PlanetTransitObservations(object):
         sigma = self.uncertainties
         y = self.weighted_obs_vector
         A = self.linear_fit_design_matrix()
-        fitresults = np.linalg.lstsq(A,y)
+        fitresults = np.linalg.lstsq(A,y,rcond=-1)
         return fitresults[0]
     def linear_fit_residuals(self):
         """
@@ -532,7 +532,7 @@ class TransitTimesLinearModels(object):
     def best_fits(self):
         A = self.design_matrices
         y = self.weighted_obs_vectors
-        return [np.linalg.lstsq(A[i],y[i])[0] for i in range(self.N)]
+        return [np.linalg.lstsq(A[i],y[i],rcond=-1)[0] for i in range(self.N)]
 
     def chi_squareds(self,per_dof=False):
         dms = self.design_matrices

@@ -29,6 +29,6 @@ def KOISystemObservations(KOINumber):
     koi_system_dframe = KOITransitTimeDataframe.query("KOI_System=='%d'"%KOI)
     for koi,obs in koi_system_dframe.groupby('KOI'):
         observations.update({
-            koi:PlanetTransitObservations(obs.TransitNumber,obs.TransitTime,obs.eTTV)
+            koi:PlanetTransitObservations(obs.TransitNumber.values,obs.TransitTime.values,obs.eTTV.values)
             })
     return observations

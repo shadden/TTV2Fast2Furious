@@ -18,11 +18,11 @@ def PerturberPeriodPhaseToBestSigmaChiSquared(Ppert,phi,TransitObservations, Pla
         Period of the pertuber
     phi : real
         Orbital phase of perturber
-    TransitData : `PlanetTransitObservations' object
+    TransitData : PlanetTransitObservations
         Observation data on transiting planet.
     PlanetData : list of reals (optional)
         List containing transiting planet's T0 and Period.
-    full_output : boole (optional)
+    full_output : bool (optional)
         Include a dictionary in the function output that contains 
          the full best fit, covariance matrix, design matrix, 
          and weighted observations vector.
@@ -104,21 +104,17 @@ def UnseenPerturberMassUpperLimit(Ppert,confidence_levels,TransitObservations ,N
     Compute mass upper limit(s) on a potential perturber at a given orbital period using transit data.
     Marginalizes over possible orbital phases of the perturber.
 
-    Arguments
-    ---------
+    Parameters
+    ----------
     Ppert : real
         The orbital period of the hypothetical perturbing planet
-
     confidence_levels : array-like
         The confidence level(s) for which to return mass upper limits.
-
-    TransitObservations : `PlanetTransitObservations' object
+    TransitObservations : PlanetTransitObservations
         Observation data on transiting planet
-
     Nphi : int (optional)
         Number of perturber phase points used to compute integrals for marginalizing over phase.
         Default value is Nphi=50.
-
     Mmax0 : real (optional)
         Initial guess of mass upper limit for root-finding purposes. All mass upper-limits are
         guessed to fall between 0 and Mmax0.
@@ -127,12 +123,13 @@ def UnseenPerturberMassUpperLimit(Ppert,confidence_levels,TransitObservations ,N
         List containing [T0,P] where T0 is the initial transit time and P is period 
          of the traniting planet. If these values are not supplied they are computed
          from the transit data.
-
     Returns
     -------
-    Array-like :
+    limits : array-like
         List of mass upper limits and the given confidence levels.
     """
+
+
 
     phases = np.linspace(-np.pi,np.pi,Nphi)
     mbest,sigma,chisq = np.array([PerturberPeriodPhaseToBestSigmaChiSquared(Ppert,phase,TransitObservations,PlanetData=PlanetData) for phase in phases]).T

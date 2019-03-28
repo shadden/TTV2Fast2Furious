@@ -19,7 +19,8 @@ sys.path.insert(0, os.path.abspath('../'))
 autodoc_mock_imports = [
     "numpy",
     "scipy",
-    "pandas"
+    "pandas",
+    "sympy"
 ]
 
 # -- Project information -----------------------------------------------------

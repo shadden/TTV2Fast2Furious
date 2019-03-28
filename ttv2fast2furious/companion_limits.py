@@ -1,28 +1,27 @@
+"""Module for computing upper limits on the mass of any unseen companions to an observed singly-transiting planet."""
 import numpy as np
 from scipy.optimize import brenth
 from scipy.special import erf
 from scipy.optimize import minimize,LinearConstraint
 from scipy.integrate import trapz
 from .ttv_basis_functions import dt0_InnerPlanet,dt0_OuterPlanet
-from . import PlanetTransitObservations
+from .ttv2fast2furious import PlanetTransitObservations
 
 def PerturberPeriodPhaseToBestSigmaChiSquared(Ppert,phi,TransitObservations, PlanetData = None,full_output=False):
     """
     Convert a hypothetical perturber period and phase to a mean and std. deviation
     of a gaussian distribution describing the perturber mass conditional posterior.
 
-    Arguments
-    ---------
+    Parameters
+    ----------
     Ppert : real
         Period of the pertuber
     phi : real
         Orbital phase of perturber
     TransitData : `PlanetTransitObservations' object
-        Observation data on transiting planet
-        Default value is set to $\pi$-Mensae c's data.
+        Observation data on transiting planet.
     PlanetData : list of reals (optional)
         List containing transiting planet's T0 and Period.
-
     full_output : boole (optional)
         Include a dictionary in the function output that contains 
          the full best fit, covariance matrix, design matrix, 
@@ -30,7 +29,7 @@ def PerturberPeriodPhaseToBestSigmaChiSquared(Ppert,phi,TransitObservations, Pla
 
     Returns
     -------
-    tuple of reals :
+    results : tuple 
         Returns the best-fit mass, mass distribution 'sigma' and the chi-squared of
         the timing residuals.
     """

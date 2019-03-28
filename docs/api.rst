@@ -1,5 +1,8 @@
 API
 ===
-.. automodule:: ttv2fast2furious
-   :members: 
-   :special-members: __init__
+.. toctree::
+   :maxdepth: 1
+
+   ttv2fast2furious
+   companion_limits
+   kepler

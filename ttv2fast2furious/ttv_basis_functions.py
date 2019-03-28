@@ -10,8 +10,28 @@ import scipy.integrate as integrate
 ##################################
 # Equations A21 and A22 
 def ellipkOsc(x,m):
+    """
+    Compute the oscillating part of elliptic function ?th kind,  K
+
+    Args:
+        x (real): elliptic function arugment
+        m (real): elliptic function modulus
+
+    Returns:
+        real
+    """
     return ellipkinc(x , m) - 2*x*ellipk(m)/(np.pi)
 def ellipeOsc(x,m):
+    """
+    Compute the oscillating part of elliptic function ?th kind, E
+
+    Args:
+        x (real): elliptic function arugment
+        m (real): elliptic function modulus
+
+    Returns:
+        real
+    """
     return ellipeinc(x , m) - 2*x*ellipe(m)/(np.pi)
 
 # oscillating part of integral (1+a^2-2a*cos(psi))^(-1/2)
@@ -140,6 +160,29 @@ def dz1Im(alpha,n1t,n1t0=0,psi0=0,l10=0):
 def getTimesOfTransit(P,l0,N):
     return np.arange(1,N+1)*P - np.mod(l0,2*np.pi) * P / (2*np.pi)
 def dt0_InnerPlanet(P,P1,T0,T10,Ntrans):
+    """
+    Compute the 0th order (in eccentricity) TTV basis function for an 
+    inner planet with exterior perturber.
+
+    Arguments
+    ---------
+        P : real
+            The period of the planet
+        P1 : real
+            The period of the perturber
+        T0 :  real
+            Planet's time of initial transit
+        T1 : real
+            Perturbers time of initial transit
+        Ntrans : int
+            Number of transits to compute
+
+    Returns
+    -------
+
+        ndarray :
+            The basis function value at sequential transit times
+    """
 
     # compute mean longitudes and synodic angle
     l = 2*np.pi * -T0 / P

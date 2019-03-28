@@ -18,7 +18,7 @@ def KOISystemObservations(KOINumber):
 
     Returns
     -------
-    observations : Dictionary of 'PlanetTransitObservations'
+    observations : dict of PlanetTransitObservations
         Transit time observations of the KOIs in the system.
     """
     KOI = int(KOINumber)

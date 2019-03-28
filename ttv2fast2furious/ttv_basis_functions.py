@@ -4,6 +4,7 @@ import numpy as np
 from scipy.special import gammainc,gammaincinv
 from scipy.special import ellipk,ellipkinc,ellipe,ellipeinc
 import scipy.integrate as integrate
+import os
 
 ##################################
 ########## dl terms #############
@@ -280,15 +281,17 @@ def get_superperiod(P,P1):
 ###########################################################
 ########## sympy for laplace coefficients #################
 ##########################################################
-from sympy import hyper,hyperexpand,S,binomial,diff,Subs,N
-_j = S("j")
-_alpha = S("alpha")
-_laplaceB= 2 * (-1)**_j *_alpha**_j * binomial(-1/S(2),_j)*hyper([1/S(2),_j+1/S(2)],[1+_j],_alpha*_alpha)
-_aDlaplaceB = _alpha * diff(_laplaceB,_alpha)
-_a2D2laplaceB = _alpha * _alpha * diff(_laplaceB,_alpha,_alpha)
-fCoeffInExprn = -_j * _laplaceB - (1/S(2)) * _aDlaplaceB
-fCoeffOutExprn = (_j + 1/S(2)) * _laplaceB + (1/S(2)) * _aDlaplaceB
-f49Coeff = -1 * (2 * _j * ( 1 + 2 *_j) * _laplaceB + (2 + 4 * _j) * _aDlaplaceB +  _a2D2laplaceB) / 4
+on_rtd = os.environ.get("READTHEDOCS", None) == "True"
+if not on_rtd:
+    from sympy import hyper,hyperexpand,S,binomial,diff,Subs,N
+    _j = S("j")
+    _alpha = S("alpha")
+    _laplaceB= 2 * (-1)**_j *_alpha**_j * binomial(-1/S(2),_j)*hyper([1/S(2),_j+1/S(2)],[1+_j],_alpha*_alpha)
+    _aDlaplaceB = _alpha * diff(_laplaceB,_alpha)
+    _a2D2laplaceB = _alpha * _alpha * diff(_laplaceB,_alpha,_alpha)
+    fCoeffInExprn = -_j * _laplaceB - (1/S(2)) * _aDlaplaceB
+    fCoeffOutExprn = (_j + 1/S(2)) * _laplaceB + (1/S(2)) * _aDlaplaceB
+    f49Coeff = -1 * (2 * _j * ( 1 + 2 *_j) * _laplaceB + (2 + 4 * _j) * _aDlaplaceB +  _a2D2laplaceB) / 4
 
 def get_fCoeffs(j,alpha):
     fCoeffIn = N(Subs(fCoeffInExprn,[_j,_alpha],[j,alpha])) 

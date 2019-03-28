@@ -24,4 +24,4 @@ from .ttv2fast2furious import PlanetTransitObservations,TransitTimesLinearModels
 from .ttv2fast2furious import MultiplanetSystemBasisFunctionMatrices
 from .ttv2fast2furious import MultiplanetSystemLinearModelAmplitudes
 
-__all__ = ['MultiplanetSystemLinearModelAmplitudes','MultiplanetSystemBasisFunctionMatrices','PlanetTransitObservations','TransitTimesLinearModels']
+__all__ = ['MultiplanetSystemLinearModelAmplitudes','MultiplanetSystemBasisFunctionMatrices','PlanetTransitObservations','TransitTimesLinearModels','companion_limits']

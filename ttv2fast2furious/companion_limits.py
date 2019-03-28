@@ -6,7 +6,7 @@ from scipy.integrate import trapz
 from .ttv_basis_functions import dt0_InnerPlanet,dt0_OuterPlanet
 from . import PlanetTransitObservations
 
-def PerturberPeriodPhaseToBestSigmaChiSquared(Ppert,phi,TransitObesrvations, PlanetData = None,full_output=False):
+def PerturberPeriodPhaseToBestSigmaChiSquared(Ppert,phi,TransitObservations, PlanetData = None,full_output=False):
     """
     Convert a hypothetical perturber period and phase to a mean and std. deviation
     of a gaussian distribution describing the perturber mass conditional posterior.
@@ -100,7 +100,7 @@ def q_integrand(mup,mbest,sigma):
     denom = 1 + erf(mbest / sigma / np.sqrt(2))
     return num / denom
 
-def UnseenPerturberMassUpperLimit(Ppert,confidence_levels,TransitData ,Nphi = 50,Mmax0 = 3e-3,PlanetData = None):
+def UnseenPerturberMassUpperLimit(Ppert,confidence_levels,TransitObservations ,Nphi = 50,Mmax0 = 3e-3,PlanetData = None):
     """
     Compute mass upper limit(s) on a potential perturber at a given orbital period using transit data.
     Marginalizes over possible orbital phases of the perturber.
@@ -113,7 +113,7 @@ def UnseenPerturberMassUpperLimit(Ppert,confidence_levels,TransitData ,Nphi = 50
     confidence_levels : array-like
         The confidence level(s) for which to return mass upper limits.
 
-    TransitData : `PlanetTransitObservations' object
+    TransitObservations : `PlanetTransitObservations' object
         Observation data on transiting planet
 
     Nphi : int (optional)
@@ -136,7 +136,7 @@ def UnseenPerturberMassUpperLimit(Ppert,confidence_levels,TransitData ,Nphi = 50
     """
 
     phases = np.linspace(-np.pi,np.pi,Nphi)
-    mbest,sigma,chisq = np.array([PerturberPeriodPhaseToBestSigmaChiSquared(Ppert,phase,TransitObesrvations,PlanetData=PlanetData) for phase in phases]).T
+    mbest,sigma,chisq = np.array([PerturberPeriodPhaseToBestSigmaChiSquared(Ppert,phase,TransitObservations,PlanetData=PlanetData) for phase in phases]).T
     dchisq = chisq - np.mean(chisq)
     q_of_mup = lambda mup: trapz( q_integrand(mup,mbest,sigma) * np.exp(-0.5 * dchisq),phases) / trapz(np.exp(-0.5 * dchisq),phases)
 

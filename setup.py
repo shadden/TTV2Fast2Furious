@@ -48,7 +48,7 @@ setup(name='ttv2fast2furious',
     ],
     keywords='astronomy astrophysics',
     packages=['ttv2fast2furious'],
-    #install_requires=['mpmath>=1.0.0', 'numpy', 'scipy>=1.0.1'],
+    install_requires=['numpy>=1.16.2', 'scipy>=1.2.1','sympy>=1.1.1','pandas>=0.20.1'],
     #tests_require=['mpmath>=1.0.0', 'sympy>=1.1.1', 'rebound>=3.5.11', 'numpy', 'scipy>=1.0.1'],
     #test_suite="ttv2fast2furious.test",
     zip_safe=False)

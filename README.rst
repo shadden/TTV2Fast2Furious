@@ -3,5 +3,5 @@ See the code documentation at https://ttv2fast2furious.readthedocs.io
 
 Install
 -------
-TTV2Fast2Furious is now in pip: ::
+TTV2Fast2Furious is now in pip ::
 	pip install ttv2fast2furious

@@ -16,10 +16,10 @@ try:
     ghash = subprocess.check_output(["git", "rev-parse", "HEAD"]).decode("ascii")
     ghash_arg = "-DCELMECHGITHASH="+ghash.strip()
 except:
-    ghash_arg = "-DCELMECHGITHASH=af2b96c4a72879cb8e9a88e9832c2a3a8049e740" #GITHASHAUTOUPDATE
+    ghash_arg = "-DCELMECHGITHASH=c5403507a729f8e8bda2cf4fa09b65704a385b01" #GITHASHAUTOUPDATE
 
 setup(name='ttv2fast2furious',
-    version='0.1.0',
+    version='0.1.1',
     description='Open source tools for TTV analysis and parameter inference.',
     url='http://github.com/shadden/TTV2Fast2Furious',
     author='Sam Hadden',

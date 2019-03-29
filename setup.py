@@ -10,14 +10,6 @@ suffix = sysconfig.get_config_var('EXT_SUFFIX')
 if suffix is None:
     suffix = ".so"
 
-# Try to get git hash
-try:
-    import subprocess
-    ghash = subprocess.check_output(["git", "rev-parse", "HEAD"]).decode("ascii")
-    ghash_arg = "-DCELMECHGITHASH="+ghash.strip()
-except:
-    ghash_arg = "-DCELMECHGITHASH=c5403507a729f8e8bda2cf4fa09b65704a385b01" #GITHASHAUTOUPDATE
-
 setup(name='ttv2fast2furious',
     version='0.1.1',
     description='Open source tools for TTV analysis and parameter inference.',
@@ -49,6 +41,5 @@ setup(name='ttv2fast2furious',
     keywords='astronomy astrophysics',
     packages=['ttv2fast2furious'],
     install_requires=['numpy', 'scipy','sympy','pandas'],
-    #tests_require=['mpmath>=1.0.0', 'sympy>=1.1.1', 'rebound>=3.5.11', 'numpy', 'scipy>=1.0.1'],
-    #test_suite="ttv2fast2furious.test",
+    include_package_data=True,
     zip_safe=False)

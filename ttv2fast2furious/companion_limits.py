@@ -39,7 +39,7 @@ def PerturberPeriodPhaseToBestSigmaChiSquared(Ppert,phi,TransitObservations, Pla
     transit_unc = TransitObservations.uncertainties
 
     assert np.alltrue(transit_num>=0), " 'TransitObservations' contains transits with negative transit numbers. Please re-number transits." 
-    assert np.alltrue(transit_time>0), " 'TransitObservations' contains transits with negative transit time. Negative transit times are not supported since a non-negative least squares algoritm is used to determine the best-fit basis function amplitudes." 
+    assert np.alltrue(transit_time>0), " 'TransitObservations' contains transits with negative transit time. Negative transit times are not supported since a non-negative least squares algorithm is used to determine the best-fit basis function amplitudes." 
 
     yvec = transit_time / transit_unc
     Ntransits = int(np.max(transit_num))

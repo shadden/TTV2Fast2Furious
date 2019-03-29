@@ -8,6 +8,7 @@
 """
 import warnings
 import numpy as np
+from scipy.optimize import nnls
 from scipy.special import gammainc,gammaincinv
 from scipy.special import ellipk,ellipkinc,ellipe,ellipeinc
 import scipy.integrate as integrate
@@ -461,12 +462,20 @@ class TransitTimesLinearModels(object):
             
         """
         self.observations=observations_list
+
+        for obs in self.observations:
+            errmsg1 = "'TransitObservations' contains transits with negative transit numbers. Please re-number transits." 
+            assert np.alltrue(obs.transit_numbers>=0), errmsg1
+
         initial_linear_fit_data = np.array([obs.linear_best_fit() for obs in self.observations ])
         self.T0s = initial_linear_fit_data[:,0]
         self.periods = initial_linear_fit_data[:,1]
         self.basis_function_matrices = [obs.basis_function_matrix() for obs in self.observations ]
         self._maximum_interaction_period_ratio = np.infty
         self._interaction_matrix = SetupInteractionMatrixWithMaxPeriodRatio(self.periods,self.maximum_interaction_period_ratio)
+        
+        #self.lower_bounds = [(-np.inf,-np.inf) for _ in self.N]
+        #self.upper_bounds = [(+np.inf,+np.inf) for _ in self.N]
 
         
     def reset(self):
@@ -532,7 +541,7 @@ class TransitTimesLinearModels(object):
     def best_fits(self):
         A = self.design_matrices
         y = self.weighted_obs_vectors
-        return [np.linalg.lstsq(A[i],y[i],rcond=-1)[0] for i in range(self.N)]
+        return [np.linalg.lstsq(A[i],y[i],rcond=None)[0] for i in range(self.N)]
 
     def chi_squareds(self,per_dof=False):
         dms = self.design_matrices

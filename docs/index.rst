@@ -3,12 +3,14 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-.. image:: logo.jpg
-   :align: center
 
 TTV2Fast2Furious
 ================
 
+.. image:: logo.jpg
+   :align: center
+   :height: 170 px
+   :width: 250 px
 
 .. toctree::
    :maxdepth: 2

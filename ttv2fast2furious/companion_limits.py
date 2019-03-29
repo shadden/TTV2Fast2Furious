@@ -1,6 +1,6 @@
 """Module for computing upper limits on the mass of any unseen companions to an observed singly-transiting planet."""
 import numpy as np
-from scipy.optimize import brenth
+from scipy.optimize import brenth,nnls
 from scipy.special import erf
 from scipy.optimize import minimize,LinearConstraint
 from scipy.integrate import trapz
@@ -38,7 +38,8 @@ def PerturberPeriodPhaseToBestSigmaChiSquared(Ppert,phi,TransitObservations, Pla
     transit_time = TransitObservations.times
     transit_unc = TransitObservations.uncertainties
 
-    assert np.alltrue(transit_num>=0)
+    assert np.alltrue(transit_num>=0), " 'TransitObservations' contains transits with negative transit numbers. Please re-number transits." 
+    assert np.alltrue(transit_time>0), " 'TransitObservations' contains transits with negative transit time. Negative transit times are not supported since a non-negative least squares algoritm is used to determine the best-fit basis function amplitudes." 
 
     yvec = transit_time / transit_unc
     Ntransits = int(np.max(transit_num))
@@ -61,17 +62,12 @@ def PerturberPeriodPhaseToBestSigmaChiSquared(Ppert,phi,TransitObservations, Pla
     design_Matrix = np.array([bfMatrix[i]/transit_unc[ni]  for ni,i in enumerate(np.array(transit_num,dtype=int))])
 
     Sigma_matrix = np.linalg.inv(design_Matrix.T.dot(design_Matrix))
-    best,chisq = np.linalg.lstsq(design_Matrix,yvec,rcond=-1)[:2]
-    chisq = chisq[0]
-    if best[2]<0:
-        to_minimize = lambda x: (design_Matrix.dot(x)-yvec).dot((design_Matrix.dot(x)-yvec))
-        x0 = np.copy(best)
-        x0[2]=0
-        minsoln = minimize(to_minimize,x0,constraints=[LinearConstraint(np.diag([0,0,1]),0,np.infty)])
-        chisq = minsoln.fun
+    # New method for obtaining best fit using scipy's 'nnls' algorithm
+    # Use of this algorithm requires all transit times to be non-negative 
+    best,chisq = nnls(design_Matrix,yvec)
 
     if full_output:
-        return best[2], np.sqrt(Sigma_matrix[2,2]) ,chisq ,dict({'best_fit':best,'CovarianceMatrix':Sigma_matrix,'DesignMatrix':design_matrix,'WeightedObsVec':yvec})
+        return best[2], np.sqrt(Sigma_matrix[2,2]) ,chisq ,dict({'BestFit':best,'CovarianceMatrix':Sigma_matrix,'DesignMatrix':design_Matrix,'WeightedObsVec':yvec,'BasisFunctionMatrix':bfMatrix})
 
     return best[2], np.sqrt(Sigma_matrix[2,2]) ,chisq
 

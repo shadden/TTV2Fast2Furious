@@ -430,8 +430,6 @@ class TransitTimesLinearModels(object):
 
     Attributes
     ----------
-    
-
     observations : list
         A list of transit time observation objects representing the transit observations for a system
     
@@ -450,19 +448,14 @@ class TransitTimesLinearModels(object):
     covariance_matrices : :obj:`list` of ndarray
         List of ndarray covariance matrices for each planets' TTV basis functions.
 
+   Parameters
+   ----------
+   observations_list : :obj:`list` of :obj:`PlanetTransitObservations`
+       Set of transit observations to model.
     """
 
     def __init__(self,observations_list):
-        """
-        Parameters
-        ----------
-
-        observations_list : :obj:`list` of :obj:`PlanetTransitObservations`
-            Set of transit observations to model.
-            
-        """
         self.observations=observations_list
-
         for obs in self.observations:
             errmsg1 = "'TransitObservations' contains transits with negative transit numbers. Please re-number transits." 
             assert np.alltrue(obs.transit_numbers>=0), errmsg1
@@ -473,10 +466,6 @@ class TransitTimesLinearModels(object):
         self.basis_function_matrices = [obs.basis_function_matrix() for obs in self.observations ]
         self._maximum_interaction_period_ratio = np.infty
         self._interaction_matrix = SetupInteractionMatrixWithMaxPeriodRatio(self.periods,self.maximum_interaction_period_ratio)
-        
-        #self.lower_bounds = [(-np.inf,-np.inf) for _ in self.N]
-        #self.upper_bounds = [(+np.inf,+np.inf) for _ in self.N]
-
         
     def reset(self):
         """

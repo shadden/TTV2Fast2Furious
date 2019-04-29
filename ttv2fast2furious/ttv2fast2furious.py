@@ -651,7 +651,7 @@ class TransitTimesLinearModels(object):
         self._interaction_matrix = SetupInteractionMatrixWithMaxPeriodRatio(self.periods,self.maximum_interaction_period_ratio)
         self.generate_basis_functions()
 
-    @property
+
     def basis_function_matrices(self):
         """list : List containing the basis function matrix of each planet"""
         return [model.basis_function_matrix for model in self.models]
@@ -702,13 +702,13 @@ class TransitTimesLinearModels(object):
         """int: Number of planets with transit observations."""
         return len(self.observations)
 
-    @property
+
     def design_matrices(self):
         """:obj:`list` of ndarrays: Design matrices for each planet's TTV model."""
         
         return [model.design_matrix() for model in self.models]
 
-    @property
+
     def covariance_matrices(self):
         """:obj:`list` of ndarrays: Covariance matrices of each planet's TTV model."""
         return [model.cov() for model in self.models]
@@ -720,7 +720,6 @@ class TransitTimesLinearModels(object):
             best.update(model.best_fit())
         return best
         
-
     def chi_squareds(self,per_dof=False):
         """Return the chi-squareds of each transit time model.
 
@@ -820,8 +819,6 @@ class TransitTimesLinearModels(object):
         fit_dict = self.best_fits()
         self.periods = [fit_dict['P{}'.format(name)] for name in self.planet_names]
         self.generate_basis_functions()
-        
-
 
     def compute_ttv_significance(self):
         Sigma = self.covariance_matrices

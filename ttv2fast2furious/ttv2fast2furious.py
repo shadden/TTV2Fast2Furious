@@ -425,17 +425,17 @@ class transit_times_model(OrderedDict):
     """
     Class representing a linear model for a single set of transit times.
 
-    Parameters
+    Attributes
     ----------
     observations : :obj:`PlanetTransitObservations` 
         Transit observations to model.
-
-    Attributes
-    ----------
-    column_labels : dict
-        Dictionary associating basis function labels to the
-        column number where they are stored in the basis function 
-        matrix.
+    parameter_bounds  : :obj:`OrderedDict`
+        A dictionary that contains bounding intervals
+        for each linear model amplitude 
+    MaxTransitNumber : int
+        Largest transit epoch number of the transits recorded in
+        'observations'. This is used when generating new basis 
+        functions to add to the model. 
     """
     def __init__(self,observations,suffix=''):
         super(transit_times_model,self).__init__()
@@ -514,6 +514,22 @@ class transit_times_model(OrderedDict):
         self.observations.function_mask(maskfn)
 
     def best_fit(self,full_output=False):
+        """Compute the best-fit transit model amplitudes
+        subject to the constraints set in 'parameter_bounds'
+        attribute.
+        
+        Arguments
+        ---------
+        full_output : bool (optional)
+            If 'True', return the 'OptimizeResult' object generated
+            by scipy.lsq_linear along with the default dictionary
+            containing best-fit amplitudes
+
+        Returns
+        -------
+        dictionary :
+            A dictionary containing the best-fit model amplitudes.
+        """
         A = self.design_matrix()
         y = self.weighted_obs_vector()
         lb,ub = np.transpose([bounds for bounds in self.parameter_bounds.values()])
@@ -522,6 +538,45 @@ class transit_times_model(OrderedDict):
         if full_output:
             return best_dict,min_result
         return best_dict
+    def residuals(self):
+        """Return the normalized residuals of the best-fit solution"""
+        best_dict,min_result = self.best_fit(full_output=True)
+        return min_result.fun
+    def chi_squared(self,per_dof=False):
+        """Return the chi-squared value of the best-fit solution.
+
+        Arguments
+        ---------
+        per_dof : bool (optional)
+            If true, return the chi-sqaured divided by the 
+            number of degrees of freedom (i.e., the number
+            of observations minus the number of model 
+            parameters). The default value is False.
+        """
+        resids = self.residuals()
+        chisq = resids.dot(resids)
+        if per_dof:
+            dof = self.Ncol - self.Nrow
+            return chisq / dof
+        return chisq
+
+    def Delta_BIC(self):
+        """
+        Return the difference in Bayesian information criteria (BICs)
+        between a purely linear transit time ephemeris and the full 
+        transit time models.
+        """
+        chisq = self.chi_squared()
+        penalty_term=np.log(self.Ncol)*self.Nrow
+        BIC_full = chisq + penalty_term
+
+        line_fit_resids = self.observations.linear_fit_residuals()
+        chisq_linear_fit = line_fit_resids.dot(line_fit_resids)
+        linear_fit_penalty = np.log(self.Ncol) * 2
+        BIC_linear = chisq_linear_fit + linear_fit_penalty
+        
+        return BIC_linear - BIC_full
+        
 
 class TransitTimesLinearModels(object):
     """
@@ -544,6 +599,9 @@ class TransitTimesLinearModels(object):
     max_period_ratio : float
         Maximum period ratio for which planet-planet interactions are 
         included in the analytic TTV models. Default value is infinite.
+    planet_names : str or list of str
+        Names to label each planet with. The planet names appear as
+        suffixes on basis function labels. 
 
     Attributes
     ----------
@@ -664,24 +722,28 @@ class TransitTimesLinearModels(object):
         
 
     def chi_squareds(self,per_dof=False):
-        dms = self.design_matrices
-        obs_weighted = self.weighted_obs_vectors
-        bests = self.best_fits
-        normalized_resids = [obs_weighted[i] - dms[i].dot(bests[i]) for i in range(self.N)]
-        if per_dof:
-            return [nr.dot(nr) / len(nr) for nr in normalized_resids]  
-        else:
-            return [nr.dot(nr) for nr in normalized_resids]  
+        """Return the chi-squareds of each transit time model.
+
+        Arguments
+        ---------
+        per_dof : bool (optional)
+            If true, return the chi-sqaured divided by the 
+            number of degrees of freedom (i.e., the number
+            of observations minus the number of model 
+            parameters). The default value is False.
+
+        Returns
+        -------
+        ndarray : 
+            Chi-squared value of each planet's transit time
+            model.
+        """
+        return np.array([mdl.chi_squared(per_dof) for mdl in self.models])
 
     def Delta_BICs(self):
-        chi_squareds = self.chi_squareds()
-        bfm_shapes = [bfm.shape for bfm in self.basis_function_matrices] 
-        penalty_terms = [ x[1] * np.log( x[0] ) for x in bfm_shapes ]
-        BICs = np.array(chi_squareds) + np.array(penalty_terms)
-        
-        line_fit_resids = [ obs.linear_fit_residuals() / obs.uncertainties for obs in self.observations ]
-        line_fit_BICs = np.array( [lfr.dot(lfr) + 2 * np.log(len(lfr)) for lfr in line_fit_resids] )
-        return line_fit_BICs - BICs
+        """Return the Delta-BIC of each transit model relative
+        to linear ephemerides"""
+        return np.array([mdl.Delta_BIC() for mdl in self.models])
 
     def generate_basis_functions(self,second_order_resonances=None):
         """Generate TTV basis functions and update planets' TTV models."""

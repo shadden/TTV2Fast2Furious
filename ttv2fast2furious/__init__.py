@@ -10,6 +10,8 @@ if suffix is None:
 import os
 import warnings
 pymodulepath = os.path.dirname(__file__)
+from ctypes import cdll
+clibttv2fast2furious = cdll.LoadLibrary(pymodulepath+"/../libttv2fast2furious"+suffix)
 
 from . import companion_limits 
 from .ttv2fast2furious import PlanetTransitObservations,TransitTimesLinearModels

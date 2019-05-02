@@ -445,6 +445,16 @@ class transit_times_model(OrderedDict):
         self['T0{}'.format(suffix)] = np.ones(observations._Ntransits)
         self['P{}'.format(suffix)] = observations._transit_numbers
         self.parameter_bounds['P{}'.format(suffix)] = (0,np.inf)
+        self._suffix = suffix
+    def __reduce__(self):
+        """Helps the class play nice with pickle_. 
+
+        .. _pickle: https://docs.python.org/3/library/pickle.html#object.__reduce__"""
+        red = (self.__class__, (self.observations,
+                                self._suffix),
+                                None,None,iter(self.items()))
+        return red
+
    
     def __getitem__(self,key):
         return super().__getitem__(key)[self.mask]
@@ -538,6 +548,18 @@ class transit_times_model(OrderedDict):
         if full_output:
             return best_dict,min_result
         return best_dict
+
+    def best_fit_vec(self):
+        """Get best-fit transit model amplitudes as a vector.
+
+        Returns
+        -------
+        ndarray : 
+            Vector representing the best-fit TTV model amplitudes
+        """
+        bfdict = self.best_fit()
+        return np.array([bfdict[x] for x in self.list_columns()])
+
     def residuals(self):
         """Return the normalized residuals of the best-fit solution"""
         best_dict,min_result = self.best_fit(full_output=True)
@@ -632,6 +654,8 @@ class TransitTimesLinearModels(object):
             assert np.alltrue(obs.transit_numbers>=0), errmsg1
 
         planet_names = kwargs.get("planet_names",["{}".format(i) for i in range(len(observations_list))])
+        assert len(planet_names) == len(self.observations),\
+            "Planet name string '{}' lengh does not match number of observations ({:d})".format(planet_names,len(self.observations))
         self.planet_names = planet_names
         self.planet_name_dict = {planet_name:i for i,planet_name in enumerate(planet_names)}
 
@@ -646,7 +670,7 @@ class TransitTimesLinearModels(object):
                 T0s = initial_linear_fit_data[:,0]
         self.T0s = T0s
         self.periods = periods
-        self.models = [ transit_times_model(obs,suffix = planet_names[i]) for i,obs in enumerate(self.observations) ]
+        self.models = [ transit_times_model(obs,suffix = self.planet_names[i]) for i,obs in enumerate(self.observations) ]
         self._maximum_interaction_period_ratio = max_period_ratio
         self._interaction_matrix = SetupInteractionMatrixWithMaxPeriodRatio(self.periods,self.maximum_interaction_period_ratio)
         self.generate_basis_functions()
@@ -835,6 +859,20 @@ class TransitTimesLinearModels(object):
             else:
                 significance_in_sigmas.append(0)
         return significance_in_sigmas
+
+    def mask_observations(self,maskfn):
+        """Mask transit observations using function 'maskfn'
+        Arguments
+        ---------
+        maskfn : callable
+            Function of observation time used to mask observations. 
+            Observations times for which 'maskfn' returns 'False' are 
+            masked out, otherwise they are included.
+        """
+        if not callable(maskfn):
+            raise TypeError("'maskfn' must be callable.")
+        for model in self.models:
+            model.function_mask(maskfn)
 
 def interactionIndicies(LMsystem,i,j):
     i_matrix = LMsystem.interaction_matrix

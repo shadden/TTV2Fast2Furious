@@ -21,7 +21,7 @@ libttv2fast2furiousmodule = Extension(
        'libttv2fast2furious',
        sources = ['src/basis_functions.c'],
        include_dirs = ['src'],
-       libraries = ['gsl','cblas','m'],
+       libraries = ['gsl','gslcblas','m'],
        library_dirs = ['/usr/local/lib','/usr/lib'],
        define_macros=[ ('LIBTTV2FAST2FURIOUS', None) ],
        extra_compile_args=['-fstrict-aliasing', '-O3','-std=c99','-Wno-unknown-pragmas', '-DLIBTTV2FAST2FURIOUS', '-fPIC'],

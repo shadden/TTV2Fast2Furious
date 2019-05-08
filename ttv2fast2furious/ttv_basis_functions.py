@@ -5,7 +5,7 @@ from scipy.special import gammainc,gammaincinv
 from scipy.special import ellipk,ellipkinc,ellipe,ellipeinc
 import scipy.integrate as integrate
 import os
-from . import clibttv2fast2furious
+from . import _clibttv2fast2furious
 from ctypes import c_double
 
 ##################################
@@ -88,18 +88,18 @@ def dl1Fn(alpha,psi):
 ##################################
 ########## dz terms #############
 ##################################
-clibttv2fast2furious.dz1Re.restype = c_double
-clibttv2fast2furious.dz1Im.restype = c_double
-clibttv2fast2furious.dzRe.restype = c_double
-clibttv2fast2furious.dzIm.restype = c_double
+_clibttv2fast2furious.dz1Re.restype = c_double
+_clibttv2fast2furious.dz1Im.restype = c_double
+_clibttv2fast2furious.dzRe.restype = c_double
+_clibttv2fast2furious.dzIm.restype = c_double
 def dzRe(alpha,t,t0=0,psi0=0,l0=0):
-    return clibttv2fast2furious.dzRe(c_double(alpha),c_double(t),c_double(t0),c_double(psi0),c_double(l0))
+    return _clibttv2fast2furious.dzRe(c_double(alpha),c_double(t),c_double(t0),c_double(psi0),c_double(l0))
 def dzIm(alpha,t,t0=0,psi0=0,l0=0):
-    return clibttv2fast2furious.dzIm(c_double(alpha),c_double(t),c_double(t0),c_double(psi0),c_double(l0))
+    return _clibttv2fast2furious.dzIm(c_double(alpha),c_double(t),c_double(t0),c_double(psi0),c_double(l0))
 def dz1Re(alpha,n1t,n1t0=0,psi0=0,l10=0):
-    return clibttv2fast2furious.dz1Re(c_double(alpha),c_double(n1t),c_double(n1t0),c_double(psi0),c_double(l10))
+    return _clibttv2fast2furious.dz1Re(c_double(alpha),c_double(n1t),c_double(n1t0),c_double(psi0),c_double(l10))
 def dz1Im(alpha,n1t,n1t0=0,psi0=0,l10=0):
-    return clibttv2fast2furious.dz1Im(c_double(alpha),c_double(n1t),c_double(n1t0),c_double(psi0),c_double(l10))
+    return _clibttv2fast2furious.dz1Im(c_double(alpha),c_double(n1t),c_double(n1t0),c_double(psi0),c_double(l10))
 
 ########################################
 ########## ttv basis functions #########

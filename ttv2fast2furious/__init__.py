@@ -2,16 +2,16 @@
 """Tools for TTV analysis and parameter inference."""
 # Find suffix
 import sysconfig
-suffix = sysconfig.get_config_var('EXT_SUFFIX')
-if suffix is None:
-    suffix = ".so"
+_suffix = sysconfig.get_config_var('EXT_SUFFIX')
+if _suffix is None:
+    _suffix = ".so"
 
 # Import shared library
 import os
 import warnings
 pymodulepath = os.path.dirname(__file__)
 from ctypes import cdll
-clibttv2fast2furious = cdll.LoadLibrary(pymodulepath+"/../libttv2fast2furious"+suffix)
+_clibttv2fast2furious = cdll.LoadLibrary(pymodulepath+"/../libttv2fast2furious"+suffix)
 
 from . import companion_limits 
 from .ttv2fast2furious import PlanetTransitObservations,TransitTimesLinearModels

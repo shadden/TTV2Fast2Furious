@@ -46,7 +46,7 @@ double integrand_im(const double nt,const double alpha,const double psi0,const d
   return 2 * alpha * (cosl * R1_re(alpha,psi) - sinl * R1_im(alpha,psi));
 }
 
-struct integrand_params {double alpha,psi0,l0};
+struct integrand_params {double alpha,psi0,l0}; 
 double integRe(double t, void * params){
 	struct integrand_params * p = (struct integrand_params *) params;
 	return integrand_re(t,p->alpha,p->psi0,p->l0);
@@ -63,7 +63,7 @@ double dzRe(const double alpha,const double t, const double t0, const double psi
 	double result,error;
 	size_t neval;
 	gsl_set_error_handler_off();
-	int err = gsl_integration_qng(&F,t0,t,ABS_ERR,REL_ERR,&result,&error,&neval);
+	gsl_integration_qng(&F,t0,t,ABS_ERR,REL_ERR,&result,&error,&neval);
 	return result;
 }
 
@@ -74,7 +74,7 @@ double dzIm(const double alpha,const double t, const double t0, const double psi
 	double result,error;
 	size_t neval;
 	gsl_set_error_handler_off();
-	int err = gsl_integration_qng(&F,t0,t,ABS_ERR,REL_ERR,&result,&error,&neval);
+	gsl_integration_qng(&F,t0,t,ABS_ERR,REL_ERR,&result,&error,&neval);
 	return result;
 }
 // 
@@ -129,7 +129,7 @@ double dz1Re(const double alpha,const double t, const double t0, const double ps
 	double result,error;
 	size_t neval;
 	gsl_set_error_handler_off();
-	int err = gsl_integration_qng(&F,t0,t,ABS_ERR,REL_ERR,&result,&error,&neval);
+	gsl_integration_qng(&F,t0,t,ABS_ERR,REL_ERR,&result,&error,&neval);
 	return result;
 }
 
@@ -140,6 +140,6 @@ double dz1Im(const double alpha,const double t, const double t0, const double ps
 	double result,error;
 	size_t neval;
 	gsl_set_error_handler_off();
-	int err = gsl_integration_qng(&F,t0,t,ABS_ERR,REL_ERR,&result,&error,&neval);
+	gsl_integration_qng(&F,t0,t,ABS_ERR,REL_ERR,&result,&error,&neval);
 	return result;
 }

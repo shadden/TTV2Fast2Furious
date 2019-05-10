@@ -9,7 +9,7 @@ all: $(SOURCES) libttv2fast2furious.so
 libttv2fast2furious.so: $(OBJECTS)
 	@echo ""
 	@echo "Linking shared library $@ ..."
-	$(CC) $(CFLAGS) -lm -lgsl -shared $(OBJECTS) -o $@
+	$(CC) $(CFLAGS) -lm -lgsl -lgslcblas -shared $(OBJECTS) -o $@
 	@echo ""
 	@echo "The shared library $< has been created successfully."
 

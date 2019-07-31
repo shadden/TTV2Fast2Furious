@@ -11,7 +11,7 @@ if suffix is None:
     suffix = ".so"
 
 setup(name='ttv2fast2furious',
-    version='0.1.2',
+    version='1.0.0',
     description='Open source tools for TTV analysis and parameter inference.',
     url='http://github.com/shadden/TTV2Fast2Furious',
     author='Sam Hadden',

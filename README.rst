@@ -1,3 +1,5 @@
+.. image:: https://zenodo.org/badge/122672643.svg
+   :target: https://zenodo.org/badge/latestdoi/122672643
 TTV2Fast2Furious
 ================
 

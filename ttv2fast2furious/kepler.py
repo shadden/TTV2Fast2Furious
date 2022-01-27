@@ -45,7 +45,7 @@ def KOISystemObservations(KOINumber):
         print("No entry found for KOI%d"%KOI)
         return None
     observations = dict()
-    koi_system_dframe = KOITransitTimeDataframe.query("KOI_System=='%d'"%KOI)
+    koi_system_dframe = KOITransitTimeDataframe.query("`KOI_System`==@KOI")
     for koi,obs in koi_system_dframe.groupby('KOI'):
         observations.update({
             koi:PlanetTransitObservations(obs.TransitNumber.values,obs.TransitTime.values,obs.eTTV.values)

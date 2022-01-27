@@ -5,10 +5,28 @@ except ImportError:
 from codecs import open
 import os
 import sys
+
 import sysconfig
 suffix = sysconfig.get_config_var('EXT_SUFFIX')
 if suffix is None:
     suffix = ".so"
+extra_link_args = []
+if sys.platform == 'darwin':
+    from distutils import sysconfig
+    vars = sysconfig.get_config_vars()
+    vars['LDSHARED'] = vars['LDSHARED'].replace('-bundle', '-shared')
+#    extra_link_args=['-Wl,-install_name,@rpath/libttv2fast2furious'+suffix]
+
+libttv2fast2furiousmodule = Extension(
+       'libttv2fast2furious',
+       sources = ['src/basis_functions.c'],
+       include_dirs = ['src'],
+       libraries = ['gsl','gslcblas','m'],
+       library_dirs = ['/usr/local/lib','/usr/lib'],
+       define_macros=[ ('LIBTTV2FAST2FURIOUS', None) ],
+       extra_compile_args=['-fstrict-aliasing', '-O3','-std=c99','-Wno-unknown-pragmas', '-DLIBTTV2FAST2FURIOUS', '-fPIC'],
+       extra_link_args=extra_link_args,
+       )
 
 setup(name='ttv2fast2furious',
     version='1.0.0',
@@ -42,4 +60,5 @@ setup(name='ttv2fast2furious',
     packages=['ttv2fast2furious'],
     install_requires=['numpy', 'scipy','sympy','pandas'],
     include_package_data=True,
+    ext_modules = [libttv2fast2furiousmodule],
     zip_safe=False)

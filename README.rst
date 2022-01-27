@@ -12,3 +12,7 @@ Install
 TTV2Fast2Furious is now on pip::
 
 	pip install ttv2fast2furious
+
+Acknowledgements
+----------------
+This project was developed in part at the Building Early Science with TESS meeting, which took place in 2019 March at the University of Chicago.

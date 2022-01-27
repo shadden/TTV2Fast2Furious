@@ -5,6 +5,8 @@ from scipy.special import gammainc,gammaincinv
 from scipy.special import ellipk,ellipkinc,ellipe,ellipeinc
 import scipy.integrate as integrate
 import os
+from . import _clibttv2fast2furious
+from ctypes import c_double
 
 ##################################
 ########## dl terms #############
@@ -86,74 +88,18 @@ def dl1Fn(alpha,psi):
 ##################################
 ########## dz terms #############
 ##################################
-# R = R0(alpha,psi) + (e*exp[i(l-w)])*R1(alpha,psi) + ...
-def R1_re(alpha,psi):
-    denom = (1+alpha*alpha-2*alpha*np.cos(psi))**(1.5)
-    direct =  0.5 * (alpha * alpha - alpha * np.cos(psi) )  / denom
-    indirect = 0.5 * alpha * np.cos(psi)
-    return direct + indirect
-def R1_im(alpha,psi):
-    denom = (1+alpha*alpha-2*alpha*np.cos(psi))**(1.5)
-    direct =  -1 * alpha * np.sin(psi)  / denom
-    indirect = alpha * np.sin(psi)
-    return direct + indirect
-    
-# dz_re / dt = integrand_re
-def integrand_re(nt,alpha,psi0,l0):
-    psi = psi0 + nt * (alpha**(1.5) - 1.0 )
-    l = nt + l0
-    return -2 * alpha * (np.sin(l) * R1_re(alpha,psi) + np.cos(l) * R1_im(alpha,psi))
-
-# dz_im / dt = integrand_re
-def integrand_im(nt,alpha,psi0,l0):
-    psi = psi0 + nt * (alpha**(1.5) - 1.0 )
-    l = nt + l0
-    return 2 * alpha * (np.cos(l) * R1_re(alpha,psi) - np.sin(l) * R1_im(alpha,psi))
-
+_clibttv2fast2furious.dz1Re.restype = c_double
+_clibttv2fast2furious.dz1Im.restype = c_double
+_clibttv2fast2furious.dzRe.restype = c_double
+_clibttv2fast2furious.dzIm.restype = c_double
 def dzRe(alpha,t,t0=0,psi0=0,l0=0):
-    I =  integrate.quad( integrand_re, t0 , t , args=(alpha,psi0,l0) )[0] 
-    return I 
+    return _clibttv2fast2furious.dzRe(c_double(alpha),c_double(t),c_double(t0),c_double(psi0),c_double(l0))
 def dzIm(alpha,t,t0=0,psi0=0,l0=0):
-    I = integrate.quad( integrand_im , t0 , t , args=(alpha,psi0,l0) )[0]
-    return  I
-
-# Rp = Rp0(alpha,psi) + (e1*exp[i(l1-w1)])*Rp1(alpha,psi) + ...
-def Rp1_re(alpha,psi):
-    denom = (1+alpha*alpha-2*alpha*np.cos(psi))**(1.5)
-
-    direct =  0.5 * (1 - alpha * np.cos(psi) )  / denom
-    
-    indirect = 0.5 * np.cos(psi) / alpha / alpha 
-
-    return direct + indirect
-
-def Rp1_im(alpha,psi):
-    denom = (1+alpha*alpha-2*alpha*np.cos(psi))**(1.5)
- 
-    direct = alpha * np.sin(psi)  / denom
-    
-    indirect =  -1 * np.sin(psi) / alpha / alpha
-    
-    return direct + indirect
-    
-# dz1_re / dt = integrand_re
-def integrand1_re(n1t,alpha,psi0,l10):
-    psi = psi0 + n1t * (1.0 - alpha**(-1.5) )
-    l = n1t + l10
-    return -2 * (np.sin(l) * Rp1_re(alpha,psi) + np.cos(l) * Rp1_im(alpha,psi))
-
-# dz_im / dt = integrand_re
-def integrand1_im(n1t,alpha,psi0,l10):
-    psi = psi0 + n1t * (1.0 - alpha**(-1.5) )
-    l = n1t + l10
-    return 2 * (np.cos(l) * Rp1_re(alpha,psi) - np.sin(l) * Rp1_im(alpha,psi))
-
+    return _clibttv2fast2furious.dzIm(c_double(alpha),c_double(t),c_double(t0),c_double(psi0),c_double(l0))
 def dz1Re(alpha,n1t,n1t0=0,psi0=0,l10=0):
-    I =  integrate.quad( integrand1_re, n1t0 , n1t , args=(alpha,psi0,l10) )[0] 
-    return I 
+    return _clibttv2fast2furious.dz1Re(c_double(alpha),c_double(n1t),c_double(n1t0),c_double(psi0),c_double(l10))
 def dz1Im(alpha,n1t,n1t0=0,psi0=0,l10=0):
-    I = integrate.quad( integrand1_im , n1t0 , n1t , args=(alpha,psi0,l10) )[0]
-    return  I
+    return _clibttv2fast2furious.dz1Im(c_double(alpha),c_double(n1t),c_double(n1t0),c_double(psi0),c_double(l10))
 
 ########################################
 ########## ttv basis functions #########

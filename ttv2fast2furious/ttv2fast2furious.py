@@ -8,12 +8,13 @@
 """
 import warnings
 import numpy as np
-from scipy.optimize import nnls
+from scipy.optimize import lsq_linear
 from scipy.special import gammainc,gammaincinv
 from scipy.special import ellipk,ellipkinc,ellipe,ellipeinc
 import scipy.integrate as integrate
 from ttv2fast2furious.ttv_basis_functions import get_nearest_firstorder,get_superperiod,dt0_InnerPlanet,dt0_OuterPlanet,get_fCoeffs
 from ttv2fast2furious.ttv_basis_functions import get_nearest_secondorder,dt2_InnerPlanet,dt2_OuterPlanet
+from collections import OrderedDict
 
 def ttv_basis_function_matrix_inner(P,P1,T0,T10,Ntrans,IncludeLinearBasis=True):
     """
@@ -73,10 +74,9 @@ def ttv_basis_function_matrix_outer(P,P1,T0,T10,Ntrans,IncludeLinearBasis=True):
            
     Returns:
         Array: the resulting basis function matrix is returned an (Ntrans, 5) array or an (Ntrans, 3) array if IncludeLinearBasis=False.
-
     """
     j = get_nearest_firstorder(P/P1)
-    assert j > 0 , "Bad period ratio!!! P,P1 = %.3f \t %.3f"%(P,P1)
+    assert j > 0 , "Bad period ratio! P,P1 = %.3f \t %.3f"%(P,P1)
     superP = get_superperiod(P,P1)
     superPhase = 2*np.pi * (j * (-T10/P1) - (j-1) * (-T0/P) )
     Times = T10 + np.arange(Ntrans) * P1
@@ -421,12 +421,209 @@ class PlanetTransitObservations(object):
         best = self.linear_best_fit()
         return self.times - M.dot(best)
 
-    
+class transit_times_model(OrderedDict):
+    """
+    Class representing a linear model for a single set of transit times.
 
+    Attributes
+    ----------
+    observations : :obj:`PlanetTransitObservations` 
+        Transit observations to model.
+    parameter_bounds  : :obj:`OrderedDict`
+        A dictionary that contains bounding intervals
+        for each linear model amplitude 
+    MaxTransitNumber : int
+        Largest transit epoch number of the transits recorded in
+        'observations'. This is used when generating new basis 
+        functions to add to the model. 
+    """
+    def __init__(self,observations,suffix=''):
+        super(transit_times_model,self).__init__()
+        self.observations = observations
+        self.parameter_bounds = OrderedDict()
+        self.MaxTransitNumber = observations._transit_numbers.max()
+        self['T0{}'.format(suffix)] = np.ones(observations._Ntransits)
+        self['P{}'.format(suffix)] = observations._transit_numbers
+        self.parameter_bounds['P{}'.format(suffix)] = (0,np.inf)
+        self._suffix = suffix
+    def __reduce__(self):
+        """Helps the class play nice with pickle_. 
+
+        .. _pickle: https://docs.python.org/3/library/pickle.html#object.__reduce__"""
+        red = (self.__class__, (self.observations,
+                                self._suffix),
+                                None,None,iter(self.items()))
+        return red
+
+   
+    def __getitem__(self,key):
+        return super().__getitem__(key)[self.mask]
+       
+    def __setitem__(self,key,val):
+        if key not in self.parameter_bounds.keys():  
+            self.parameter_bounds[key]=(-np.inf,np.inf)
+        super().__setitem__(key,val)
+        
+    @property
+    def mask(self):
+        return self.observations._mask
+
+    @property
+    def Nrow(self):
+        """int: Number of basis function matrix rows"""
+        return len(self)
+
+    @property
+    def Ncol(self):
+        """int: Number of basis function matrix columns"""
+        return self.observations.Ntransits
+
+    @property
+    def basis_function_matrix(self):
+        """Return the basis function matrix."""
+        return np.vstack([val[self.mask] for val in self.values()]).T
+    
+    def design_matrix(self):
+        """Return the design matrix."""
+        sigma_vec = self.observations.uncertainties
+        Atranspose = np.transpose(self.basis_function_matrix) / sigma_vec
+        return np.transpose(Atranspose)
+
+    def cov_inv(self):
+        """Return the inverese covariance matrix"""
+        A = self.design_matrix()
+        return np.transpose(A).dot(A)
+
+    def cov(self):
+        """Return the covariance matrix."""
+        return np.linalg.inv(self.cov_inv())
+
+    def list_columns(self):
+        """List the column labels of the basis function matrix"""
+        return [key for key in self.keys()]
+    
+    def weighted_obs_vector(self):
+        """Observation times weighed by uncertainties.
+           
+           Used primarily in least-squares fitting along with design
+           matrix. 
+        """
+        return self.observations.times / self.observations.uncertainties
+
+    def function_mask(self,maskfn):
+        """Mask the underlying observations using function 'maskfn'
+        Arguments
+        ---------
+        maskfn : callable
+            Function of observationt time used to mask observations. 
+            Observations times for which 'maskfn' returns 'False' are 
+            masked out, otherwise they are included.
+        """
+        if not callable(maskfn):
+            raise TypeError("'maskfn' must be callable.")
+        self.observations.function_mask(maskfn)
+
+    def best_fit(self,full_output=False):
+        """Compute the best-fit transit model amplitudes
+        subject to the constraints set in 'parameter_bounds'
+        attribute.
+        
+        Arguments
+        ---------
+        full_output : bool (optional)
+            If 'True', return the 'OptimizeResult' object generated
+            by scipy.lsq_linear along with the default dictionary
+            containing best-fit amplitudes
+
+        Returns
+        -------
+        dictionary :
+            A dictionary containing the best-fit model amplitudes.
+        """
+        A = self.design_matrix()
+        y = self.weighted_obs_vector()
+        lb,ub = np.transpose([bounds for bounds in self.parameter_bounds.values()])
+        min_result = lsq_linear(A,y,bounds = (lb,ub))
+        best_dict = {key:val for key,val in  zip(self.keys(),min_result.x)}
+        if full_output:
+            return best_dict,min_result
+        return best_dict
+
+    def best_fit_vec(self):
+        """Get best-fit transit model amplitudes as a vector.
+
+        Returns
+        -------
+        ndarray : 
+            Vector representing the best-fit TTV model amplitudes
+        """
+        bfdict = self.best_fit()
+        return np.array([bfdict[x] for x in self.list_columns()])
+
+    def residuals(self):
+        """Return the normalized residuals of the best-fit solution"""
+        best_dict,min_result = self.best_fit(full_output=True)
+        return min_result.fun
+    def chi_squared(self,per_dof=False):
+        """Return the chi-squared value of the best-fit solution.
+
+        Arguments
+        ---------
+        per_dof : bool (optional)
+            If true, return the chi-sqaured divided by the 
+            number of degrees of freedom (i.e., the number
+            of observations minus the number of model 
+            parameters). The default value is False.
+        """
+        resids = self.residuals()
+        chisq = resids.dot(resids)
+        if per_dof:
+            dof = self.Ncol - self.Nrow
+            return chisq / dof
+        return chisq
+
+    def Delta_BIC(self):
+        """
+        Return the difference in Bayesian information criteria (BICs)
+        between a purely linear transit time ephemeris and the full 
+        transit time models.
+        """
+        chisq = self.chi_squared()
+        penalty_term=np.log(self.Ncol)*self.Nrow
+        BIC_full = chisq + penalty_term
+
+        line_fit_resids = self.observations.linear_fit_residuals()
+        chisq_linear_fit = line_fit_resids.dot(line_fit_resids)
+        linear_fit_penalty = np.log(self.Ncol) * 2
+        BIC_linear = chisq_linear_fit + linear_fit_penalty
+        
+        return BIC_linear - BIC_full
+        
 
 class TransitTimesLinearModels(object):
     """
     Object representing a collection of transit time linear models in a system of interacting planets.
+
+   Parameters
+   ----------
+   observations_list : :obj:`list` of :obj:`PlanetTransitObservations`
+       Set of transit observations to model.
+
+    Keyword Arguments
+    -----------------
+    periods : :obj:`list` of floats
+        Orbital periods of the transiting planets. Periods are determined
+        by an initial least-squares fit if they are not supplied as a 
+        keyword argument.
+    T0s : :obj:`list` of floats
+        Inital times of transits. Determined by a least-squares fit
+        when not supplied as a keyword argument
+    max_period_ratio : float
+        Maximum period ratio for which planet-planet interactions are 
+        included in the analytic TTV models. Default value is infinite.
+    planet_names : str or list of str
+        Names to label each planet with. The planet names appear as
+        suffixes on basis function labels. 
 
     Attributes
     ----------
@@ -448,25 +645,41 @@ class TransitTimesLinearModels(object):
     covariance_matrices : :obj:`list` of ndarray
         List of ndarray covariance matrices for each planets' TTV basis functions.
 
-   Parameters
-   ----------
-   observations_list : :obj:`list` of :obj:`PlanetTransitObservations`
-       Set of transit observations to model.
     """
 
-    def __init__(self,observations_list):
+    def __init__(self,observations_list,**kwargs):
         self.observations=observations_list
         for obs in self.observations:
             errmsg1 = "'TransitObservations' contains transits with negative transit numbers. Please re-number transits." 
             assert np.alltrue(obs.transit_numbers>=0), errmsg1
 
-        initial_linear_fit_data = np.array([obs.linear_best_fit() for obs in self.observations ])
-        self.T0s = initial_linear_fit_data[:,0]
-        self.periods = initial_linear_fit_data[:,1]
-        self.basis_function_matrices = [obs.basis_function_matrix() for obs in self.observations ]
-        self._maximum_interaction_period_ratio = np.infty
+        planet_names = kwargs.get("planet_names",["{}".format(i) for i in range(len(observations_list))])
+        assert len(planet_names) == len(self.observations),\
+            "Planet name string '{}' lengh does not match number of observations ({:d})".format(planet_names,len(self.observations))
+        self.planet_names = planet_names
+        self.planet_name_dict = {planet_name:i for i,planet_name in enumerate(planet_names)}
+
+        periods=kwargs.get("periods",None)
+        T0s =kwargs.get("T0s",None)
+        max_period_ratio=kwargs.get("max_period_ratio",np.infty)
+        if periods is None or T0s is None:
+            initial_linear_fit_data = np.array([obs.linear_best_fit() for obs in self.observations ])
+            if periods is None:
+                periods = initial_linear_fit_data[:,1] 
+            if T0s is None:
+                T0s = initial_linear_fit_data[:,0]
+        self.T0s = T0s
+        self.periods = periods
+        self.models = [ transit_times_model(obs,suffix = self.planet_names[i]) for i,obs in enumerate(self.observations) ]
+        self._maximum_interaction_period_ratio = max_period_ratio
         self._interaction_matrix = SetupInteractionMatrixWithMaxPeriodRatio(self.periods,self.maximum_interaction_period_ratio)
-        
+        self.generate_basis_functions()
+
+
+    def basis_function_matrices(self):
+        """list : List containing the basis function matrix of each planet"""
+        return [model.basis_function_matrix for model in self.models]
+
     def reset(self):
         """
         Reset TTV model.
@@ -478,10 +691,9 @@ class TransitTimesLinearModels(object):
         initial_linear_fit_data = np.array([obs.linear_best_fit() for obs in self.observations ])
         self.T0s = initial_linear_fit_data[:,0]
         self.periods = initial_linear_fit_data[:,1]
-        self.basis_function_matrices = [obs.basis_function_matrix() for obs in self.observations ]
+        self.models = [ transit_times_model(obs) for obs in self.observations ]
         self._maximum_interaction_period_ratio = np.infty
         self._interaction_matrix = SetupInteractionMatrixWithMaxPeriodRatio(self.periods,self.maximum_interaction_period_ratio)
-
 
     @property 
     def interaction_matrix(self):
@@ -492,6 +704,7 @@ class TransitTimesLinearModels(object):
         planet *i* are included in the model for planet i's TTV.
         """
         return self._interaction_matrix
+
     @interaction_matrix.setter
     def interaction_matrix(self,value):
         self._interaction_matrix = value
@@ -512,90 +725,124 @@ class TransitTimesLinearModels(object):
     def N(self):
         """int: Number of planets with transit observations."""
         return len(self.observations)
-    @property
-    def weighted_obs_vectors(self):
-        return [obs.weighted_obs_vector for obs in self.observations]
-    @property
+
+
     def design_matrices(self):
         """:obj:`list` of ndarrays: Design matrices for each planet's TTV model."""
-        bfs = self.basis_function_matrices
-        uncs= [o.uncertainties for o in self.observations ]
-        return [np.transpose(bfs[i].T/uncs[i]) for i in range(self.N)]
-    @property
-    def covariance_matrices(self):
-        A = self.design_matrices
-        return [ np.linalg.inv( A[i].T.dot(A[i]) ) for i in range(self.N)]
-    
-    @property
-    def best_fits(self):
-        A = self.design_matrices
-        y = self.weighted_obs_vectors
-        return [np.linalg.lstsq(A[i],y[i],rcond=None)[0] for i in range(self.N)]
-
-    def chi_squareds(self,per_dof=False):
-        dms = self.design_matrices
-        obs_weighted = self.weighted_obs_vectors
-        bests = self.best_fits
-        normalized_resids = [obs_weighted[i] - dms[i].dot(bests[i]) for i in range(self.N)]
-        if per_dof:
-            return [nr.dot(nr) / len(nr) for nr in normalized_resids]  
-        else:
-            return [nr.dot(nr) for nr in normalized_resids]  
-    def Delta_BICs(self):
-        chi_squareds = self.chi_squareds()
-        bfm_shapes = [bfm.shape for bfm in self.basis_function_matrices] 
-        penalty_terms = [ x[1] * np.log( x[0] ) for x in bfm_shapes ]
-        BICs = np.array(chi_squareds) + np.array(penalty_terms)
         
-        line_fit_resids = [ obs.linear_fit_residuals() / obs.uncertainties for obs in self.observations ]
-        line_fit_BICs = np.array( [lfr.dot(lfr) + 2 * np.log(len(lfr)) for lfr in line_fit_resids] )
-        return line_fit_BICs - BICs
-    def quicklook_plot(self,axis):
-        for obs in self.observations:
-            resid_MIN = 24*60*(obs.linear_fit_residuals())
-            unc_MIN = 24*60*obs.uncertainties
-            axis.errorbar(obs.times,resid_MIN,yerr=unc_MIN)
-        axis.set_xlabel("Time [d.]")
-        axis.set_ylabel("TTV [min.]")
+        return [model.design_matrix() for model in self.models]
+
+
+    def covariance_matrices(self):
+        """:obj:`list` of ndarrays: Covariance matrices of each planet's TTV model."""
+        return [model.cov() for model in self.models]
     
-    def generate_new_basis_function_matrices(self):
-        i_matrix=self.interaction_matrix
-        maxTransitNumbers = [np.max(o.transit_numbers)+1 for o in self.observations]
-        bf_matrices_full = MultiplanetSystemBasisFunctionMatrices(\
-                            self.N,self.periods,self.T0s,maxTransitNumbers,InteractionMatrix=i_matrix)
-        return [bf_matrices_full[i][(self.observations[i].transit_numbers)].astype(float) for i in range(self.N)]
+    def best_fits(self):
+        """:obj:`list` of ndarrays: best-fit model amplitudes for each planet's TTV model."""
+        best = dict()
+        for model in self.models:
+            best.update(model.best_fit())
+        return best
+        
+    def chi_squareds(self,per_dof=False):
+        """Return the chi-squareds of each transit time model.
+
+        Arguments
+        ---------
+        per_dof : bool (optional)
+            If true, return the chi-sqaured divided by the 
+            number of degrees of freedom (i.e., the number
+            of observations minus the number of model 
+            parameters). The default value is False.
+
+        Returns
+        -------
+        ndarray : 
+            Chi-squared value of each planet's transit time
+            model.
+        """
+        return np.array([mdl.chi_squared(per_dof) for mdl in self.models])
+
+    def Delta_BICs(self):
+        """Return the Delta-BIC of each transit model relative
+        to linear ephemerides"""
+        return np.array([mdl.Delta_BIC() for mdl in self.models])
+
+    def generate_basis_functions(self,second_order_resonances=None):
+        """Generate TTV basis functions and update planets' TTV models."""
+        for name_i,i in self.planet_name_dict.items():
+            per_i = self.periods[i]
+            T0_i = self.T0s[i]
+            model  = self.models[i]
+            Ntrans = model.MaxTransitNumber+1
+            for name_j,j in self.planet_name_dict.items():
+                if self.interaction_matrix[i,j]:
+                    per_j = self.periods[j]
+                    T0_j = self.T0s[j]
+                    bf_mtrx = get_ttv_basis_function_matrix(
+                            per_i, per_j, T0_i, T0_j,Ntrans
+                            )
+                    bf_mtrx = bf_mtrx[model.observations._transit_numbers]
+                    model['dt0_{}{}'.format(name_i,name_j)] = bf_mtrx[:,0]
+                    model.parameter_bounds['dt0_{}{}'.format(name_i,name_j)] = (0,1)
+                    model['dt1x_{}{}'.format(name_i,name_j)] = bf_mtrx[:,1]
+                    model['dt1y_{}{}'.format(name_i,name_j)] = bf_mtrx[:,2]
+                           
+    def add_second_order_resonance(self,planet1,planet2):
+        """Add basis-functions for a second-order resonance.
+
+        Arguments
+        ---------
+        planet1 : str or int
+            Name or index of the first planet
+        planet2 : str or int
+            Name or index of the second planet
+        """
+
+        if type(planet1) is str:
+            i1str = planet1
+            i1 = self.planet_name_dict[planet1]
+        elif type(planet1) is int:
+            i1str = list(self.planet_name_dict.keys())[planet1]
+            i1 = planet1
+        else:
+            raise ValueError("'planet1' must be of type 'int' or 'str'")
+
+        if type(planet2) is str:
+            i2str = planet2
+            i2 = self.planet_name_dict[planet2]
+        elif type(planet2) is int:
+            i2str = list(self.planet_name_dict.keys())[planet2]
+            i2 = planet2
+        else:
+            raise ValueError("'planet2' must be of type 'int' or 'str'")
+        
+        p1 = self.periods[i1]
+        p2 = self.periods[i2]
+        T01 = self.T0s[i1]
+        T02 = self.T0s[i2]
+        Ntr1 = self.models[i1].MaxTransitNumber + 1
+        Ntr2 = self.models[i2].MaxTransitNumber + 1
+        if p1 < p2:
+            dt2_1 = dt2_InnerPlanet(p1,p2,T01,T02,Ntr1).astype(float)
+            dt2_2 = dt2_OuterPlanet(p1,p2,T01,T02,Ntr2).astype(float)
+        else:
+            dt2_1 = dt2_OuterPlanet(p2,p1,T02,T01,Ntr1).astype(float)
+            dt2_2 = dt2_InnerPlanet(p2,p1,T02,T01,Ntr2).astype(float)
+
+        self.models[i1]['dt2x_{}{}'.format(i1str,i2str)] = dt2_1[:,0]
+        self.models[i1]['dt2y_{}{}'.format(i1str,i2str)] = dt2_1[:,1]
+        self.models[i2]['dt2x_{}{}'.format(i2str,i1str)] = dt2_2[:,0]
+        self.models[i2]['dt2y_{}{}'.format(i2str,i1str)] = dt2_2[:,1]
 
     def update_fits(self):
-        neg_periods_Q = np.any(np.array(self.periods)<0)
-        if neg_periods_Q:
-            warnings.warn("Negative period(s) found, resetting periods to linear best fit values!",RuntimeWarning)
-            old_max_int_per = self.maximum_interaction_period_ratio
-            self.reset()
-            self.maximum_interaction_period_ratio = old_max_int_per
-        
-        self.basis_function_matrices = self.generate_new_basis_function_matrices()
-        self.periods = [fit[1] for fit in self.best_fits]
-
-    def update_with_second_order_resonance(self,i1,i2):
-        self.basis_function_matrices = self.generate_new_basis_function_matrices()
-        pIn = self.periods[i1]
-        pOut = self.periods[i2]
-        tIn = self.T0s[i1]
-        tOut = self.T0s[i2]
-
-        obsIn = self.observations[i1]
-        obsOut = self.observations[i2]
-        NtrIn = obsIn.transit_numbers[-1] + 1
-        NtrOut = obsOut.transit_numbers[-1] + 1
-
-        t2in = dt2_InnerPlanet(pIn,pOut,tIn,tOut,NtrIn)
-        t2out = dt2_OuterPlanet(pIn,pOut,tIn,tOut,NtrOut)
-        t2in = t2in[obsIn.transit_numbers]
-        t2out = t2out[obsOut.transit_numbers]
-        self.basis_function_matrices[i1]=np.hstack((self.basis_function_matrices[i1],t2in)).astype(float)
-        self.basis_function_matrices[i2]=np.hstack((self.basis_function_matrices[i2],t2out)).astype(float)
-
-        self.periods = [fit[1] for fit in self.best_fits]
+        """
+        Compute the best-fit periods using current model then re-compute
+        model basis functions.
+        """
+        fit_dict = self.best_fits()
+        self.periods = [fit_dict['P{}'.format(name)] for name in self.planet_names]
+        self.generate_basis_functions()
 
     def compute_ttv_significance(self):
         Sigma = self.covariance_matrices
@@ -612,6 +859,20 @@ class TransitTimesLinearModels(object):
             else:
                 significance_in_sigmas.append(0)
         return significance_in_sigmas
+
+    def mask_observations(self,maskfn):
+        """Mask transit observations using function 'maskfn'
+        Arguments
+        ---------
+        maskfn : callable
+            Function of observation time used to mask observations. 
+            Observations times for which 'maskfn' returns 'False' are 
+            masked out, otherwise they are included.
+        """
+        if not callable(maskfn):
+            raise TypeError("'maskfn' must be callable.")
+        for model in self.models:
+            model.function_mask(maskfn)
 
 def interactionIndicies(LMsystem,i,j):
     i_matrix = LMsystem.interaction_matrix

@@ -651,7 +651,7 @@ class TransitTimesLinearModels(object):
         self.observations=observations_list
         for obs in self.observations:
             errmsg1 = "'TransitObservations' contains transits with negative transit numbers. Please re-number transits." 
-            assert np.alltrue(obs.transit_numbers>=0), errmsg1
+            assert np.all(obs.transit_numbers>=0), errmsg1
 
         planet_names = kwargs.get("planet_names",["{}".format(i) for i in range(len(observations_list))])
         assert len(planet_names) == len(self.observations),\
@@ -661,7 +661,7 @@ class TransitTimesLinearModels(object):
 
         periods=kwargs.get("periods",None)
         T0s =kwargs.get("T0s",None)
-        max_period_ratio=kwargs.get("max_period_ratio",np.infty)
+        max_period_ratio=kwargs.get("max_period_ratio",np.inf)
         if periods is None or T0s is None:
             initial_linear_fit_data = np.array([obs.linear_best_fit() for obs in self.observations ])
             if periods is None:

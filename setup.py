@@ -29,7 +29,7 @@ libttv2fast2furiousmodule = Extension(
        )
 
 setup(name='ttv2fast2furious',
-    version='1.0.0',
+    version='1.1.0',
     description='Open source tools for TTV analysis and parameter inference.',
     url='http://github.com/shadden/TTV2Fast2Furious',
     author='Sam Hadden',
